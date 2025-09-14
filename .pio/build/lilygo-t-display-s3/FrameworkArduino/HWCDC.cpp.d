@@ -1,6 +1,6 @@
 .pio/build/lilygo-t-display-s3/FrameworkArduino/HWCDC.cpp.o: \
  C:/Users/sayno/.platformio/packages/framework-arduinoespressif32/cores/esp32/HWCDC.cpp \
- C:/Users/sayno/OneDrive/Documents/GitHub/ELEC3020__Embedded_Systems/test/.pio/libdeps/lilygo-t-display-s3/TFT_eSPI/User_Setups/Setup206_LilyGo_T_Display_S3.h \
+ C:/Users/sayno/OneDrive/Documents/GitHub/ELEC3020_project/.pio/libdeps/lilygo-t-display-s3/TFT_eSPI/User_Setups/Setup206_LilyGo_T_Display_S3.h \
  C:/Users/sayno/.platformio/packages/framework-arduinoespressif32/cores/esp32/USB.h \
  C:/Users/sayno/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_opi/include/sdkconfig.h \
  C:/Users/sayno/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/esp_event/include/esp_event.h \

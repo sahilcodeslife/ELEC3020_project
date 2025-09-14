@@ -1,6 +1,6 @@
 .pio/build/lilygo-t-display-s3/FrameworkArduino/esp32-hal-cpu.c.o: \
  C:/Users/sayno/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-cpu.c \
- C:/Users/sayno/OneDrive/Documents/GitHub/ELEC3020__Embedded_Systems/test/.pio/libdeps/lilygo-t-display-s3/TFT_eSPI/User_Setups/Setup206_LilyGo_T_Display_S3.h \
+ C:/Users/sayno/OneDrive/Documents/GitHub/ELEC3020_project/.pio/libdeps/lilygo-t-display-s3/TFT_eSPI/User_Setups/Setup206_LilyGo_T_Display_S3.h \
  C:/Users/sayno/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_opi/include/sdkconfig.h \
  C:/Users/sayno/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/freertos/include/freertos/FreeRTOS.h \
  C:/Users/sayno/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/freertos/include/esp_additions/freertos/FreeRTOSConfig.h \

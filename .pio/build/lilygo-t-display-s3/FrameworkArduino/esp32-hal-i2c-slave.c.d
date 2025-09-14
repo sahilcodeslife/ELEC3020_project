@@ -1,6 +1,6 @@
 .pio/build/lilygo-t-display-s3/FrameworkArduino/esp32-hal-i2c-slave.c.o: \
  C:/Users/sayno/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-i2c-slave.c \
- C:/Users/sayno/OneDrive/Documents/GitHub/ELEC3020__Embedded_Systems/test/.pio/libdeps/lilygo-t-display-s3/TFT_eSPI/User_Setups/Setup206_LilyGo_T_Display_S3.h \
+ C:/Users/sayno/OneDrive/Documents/GitHub/ELEC3020_project/.pio/libdeps/lilygo-t-display-s3/TFT_eSPI/User_Setups/Setup206_LilyGo_T_Display_S3.h \
  C:/Users/sayno/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/esp_common/include/esp_attr.h \
  C:/Users/sayno/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/esp_rom/include/esp32s3/rom/gpio.h \
  C:/Users/sayno/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/soc/esp32s3/include/soc/gpio_reg.h \

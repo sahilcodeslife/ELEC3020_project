@@ -1,6 +1,6 @@
 .pio/build/lilygo-t-display-s3/lib3eb/LittleFS/LittleFS.cpp.o: \
  C:/Users/sayno/.platformio/packages/framework-arduinoespressif32/libraries/LittleFS/src/LittleFS.cpp \
- C:/Users/sayno/OneDrive/Documents/GitHub/ELEC3020__Embedded_Systems/test/.pio/libdeps/lilygo-t-display-s3/TFT_eSPI/User_Setups/Setup206_LilyGo_T_Display_S3.h \
+ C:/Users/sayno/OneDrive/Documents/GitHub/ELEC3020_project/.pio/libdeps/lilygo-t-display-s3/TFT_eSPI/User_Setups/Setup206_LilyGo_T_Display_S3.h \
  C:/Users/sayno/.platformio/packages/framework-arduinoespressif32/libraries/FS/src/vfs_api.h \
  C:/Users/sayno/.platformio/packages/framework-arduinoespressif32/libraries/FS/src/FS.h \
  C:/Users/sayno/.platformio/packages/framework-arduinoespressif32/cores/esp32/Arduino.h \
