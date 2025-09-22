@@ -5,6 +5,12 @@
 #define AIN1 18
 #define AIN2 17
 #define PWMA 12
+
+// Motor B pins
+#define BIN1 16
+#define BIN2 1
+#define PWMB 13
+
 #define STBY 21
 
 // Ultrasonic sensor pins
@@ -12,7 +18,8 @@
 #define ECHO 44
 
 // PWM settings
-#define PWM_CHANNEL 0
+#define PWM_CHANNEL_A 0
+#define PWM_CHANNEL_B 1
 #define PWM_FREQ 1000
 #define PWM_RESOLUTION 8
 
@@ -22,6 +29,8 @@ TFT_eSPI tft = TFT_eSPI();
 void setup() {
     pinMode(AIN1, OUTPUT);
     pinMode(AIN2, OUTPUT);
+    pinMode(BIN1, OUTPUT);
+    pinMode(BIN2, OUTPUT);
     pinMode(STBY, OUTPUT);
     pinMode(TRIG, OUTPUT);
     pinMode(ECHO, INPUT);
@@ -29,8 +38,12 @@ void setup() {
     digitalWrite(STBY, HIGH);
     digitalWrite(TRIG, LOW);
 
-    ledcSetup(PWM_CHANNEL, PWM_FREQ, PWM_RESOLUTION);
-    ledcAttachPin(PWMA, PWM_CHANNEL);
+    // PWM setup
+    ledcSetup(PWM_CHANNEL_A, PWM_FREQ, PWM_RESOLUTION);
+    ledcAttachPin(PWMA, PWM_CHANNEL_A);
+
+    ledcSetup(PWM_CHANNEL_B, PWM_FREQ, PWM_RESOLUTION);
+    ledcAttachPin(PWMB, PWM_CHANNEL_B);
 
     // TFT init
     tft.init();
@@ -52,24 +65,41 @@ long getDistanceCM() {
     return duration * 0.034 / 2;
 }
 
+void motorAForward(int speed) {
+    digitalWrite(AIN1, HIGH);
+    digitalWrite(AIN2, LOW);
+    ledcWrite(PWM_CHANNEL_A, speed);
+}
+
+void motorBForward(int speed) {
+    digitalWrite(BIN1, HIGH);
+    digitalWrite(BIN2, LOW);
+    ledcWrite(PWM_CHANNEL_B, speed);
+}
+
+void motorStop() {
+    digitalWrite(AIN1, LOW);
+    digitalWrite(AIN2, LOW);
+    ledcWrite(PWM_CHANNEL_A, 0);
+
+    digitalWrite(BIN1, LOW);
+    digitalWrite(BIN2, LOW);
+    ledcWrite(PWM_CHANNEL_B, 0);
+}
+
 void loop() {
     long distance = getDistanceCM();
 
     tft.fillRect(0, 0, 240, 40, TFT_BLACK);  // clear text area
 
-    if (distance > 0 && distance < 15) {
-        // motor forward
-        digitalWrite(AIN1, HIGH);
-        digitalWrite(AIN2, LOW);
-        ledcWrite(PWM_CHANNEL, 200);
+    if (distance > 0 && distance < 300) {
+        motorAForward(250);
+        motorBForward(250);
 
         tft.setCursor(10, 10);
-        tft.print("Object detected");
+        tft.printf("Object detected%i",distance);
     } else {
-        // motor stop
-        digitalWrite(AIN1, LOW);
-        digitalWrite(AIN2, LOW);
-        ledcWrite(PWM_CHANNEL, 0);
+        motorStop();
 
         tft.setCursor(10, 10);
         tft.print("No object");
