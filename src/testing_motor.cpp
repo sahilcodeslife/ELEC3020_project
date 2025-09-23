@@ -20,7 +20,7 @@
 // PWM settings
 #define PWM_CHANNEL_A 0
 #define PWM_CHANNEL_B 1
-#define PWM_FREQ 1000
+#define PWM_FREQ 20000
 #define PWM_RESOLUTION 8
 
 // Display
@@ -92,9 +92,9 @@ void loop() {
 
     tft.fillRect(0, 0, 240, 40, TFT_BLACK);  // clear text area
 
-    if (distance > 0 && distance < 300) {
-        motorAForward(250);
-        motorBForward(250);
+    if (distance > 0 && distance < 20) {
+        motorAForward(220);
+        motorBForward(220);
 
         tft.setCursor(10, 10);
         tft.printf("Object detected%i",distance);
