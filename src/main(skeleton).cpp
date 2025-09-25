@@ -16,6 +16,7 @@
 #define SONIC_OUT_PIN 18
 #define SONIC_IN_PIN1 43
 #define SONIC_IN_PIN2 44
+#define SONIC_REFRESH_RATE 12000 // max distance of about 2 meters
 //----------------------------------------------------------
 
 //-----------DEFINING_MOTORS-------------------------------
@@ -30,6 +31,11 @@ TFT_eSPI tft = TFT_eSPI();
 
 //----------VARIABLES_FOR_ULTRASONIC_SENSORS----------------
 hw_timer_t *SonicTriggerTimer = NULL;
+hw_timer_t *SonicRefreshTimer = NULL;
+int StartTime1;
+int StartTime2;
+float dist1;
+float dist2;
 //----------------------------------------------------------
 
 //------------VARIABLES_FOR_LINE_SENSORS-------------------
@@ -86,8 +92,10 @@ int modeB = 1;
 void IRAM_ATTR SonicSensorTrigger();
 void PWMA();
 void PWMB();
+void SonicDistance1();
+void SonicDistance2();
+void SonicSense();
 //------------------------------------------------------------
-
 void setup() {
   // setup for pins of buttons
   pinMode(LEFT_BUTTON,INPUT_PULLUP);
@@ -118,8 +126,16 @@ void setup() {
   pinMode(SONIC_IN_PIN2,INPUT_PULLUP);
 
   SonicTriggerTimer = timerBegin(0,80,true);
+  SonicRefreshTimer = timerBegin(0,80,true);
   timerAttachInterrupt(SonicTriggerTimer,SonicSensorTrigger,true);
+  timerAttachInterrupt(SonicRefreshTimer,SonicSense,true);
   timerAlarmWrite(SonicTriggerTimer,10,false);
+  timerAlarmWrite(SonicRefreshTimer,SONIC_REFRESH_RATE,true);
+  attachInterrupt(SONIC_IN_PIN1,SonicDistance1,CHANGE);
+  attachInterrupt(SONIC_IN_PIN2,SonicDistance2,CHANGE);
+
+  timerRestart(SonicRefreshTimer);
+  timerAlarmEnable(SonicRefreshTimer);
 
   // use these commands to run the timer and trigger the ultrasonic sensors
   // timerRestart(SonicTriggerTimer);
@@ -148,11 +164,7 @@ void loop() {
   PWMA();
   PWMB();
 
-  
-}
 
-void IRAM_ATTR SonicSensorTrigger() {
-  digitalWrite(SONIC_OUT_PIN,LOW);
 }
 
 void PWMA() {
@@ -185,3 +197,30 @@ void PWMB() {
     }
 }
 
+void SonicDistance1() {
+  if(digitalRead(SONIC_IN_PIN1) == HIGH) {
+    StartTime1 = micros();
+  } else {
+    int EchoTime1 = micros() - StartTime1;
+    dist1 = (EchoTime1 * 0.0343)/2;
+  }
+}
+
+void SonicDistance2() {
+  if(digitalRead(SONIC_IN_PIN2) == HIGH) {
+    StartTime2 = micros();
+  } else {
+    int EchoTime2 = micros() - StartTime1;
+    dist2 = (EchoTime2 * 0.0343)/2;
+  }
+}
+
+void IRAM_ATTR SonicSensorTrigger() {
+  digitalWrite(SONIC_OUT_PIN,LOW);
+}
+
+void SonicSense() {
+  timerRestart(SonicTriggerTimer);
+  digitalWrite(SONIC_OUT_PIN,HIGH);
+  timerAlarmEnable(SonicTriggerTimer);
+}
