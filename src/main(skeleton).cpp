@@ -33,26 +33,36 @@ hw_timer_t *SonicTriggerTimer = NULL;
 //----------------------------------------------------------
 
 //------------VARIABLES_FOR_LINE_SENSORS-------------------
+bool SituationChange = false;
+
 bool Line_Sensor_1;
 void ChangeSensor1() {
+  bool SituationChange = true;
   Line_Sensor_1 = digitalRead(SENSOR_LINE_1_PIN);
 }
 bool Line_Sensor_2;
 void ChangeSensor2() {
+  bool SituationChange = true;
   Line_Sensor_2 = digitalRead(SENSOR_LINE_2_PIN);
 }
 bool Line_Sensor_3;
 void ChangeSensor3() {
+  bool SituationChange = true;
   Line_Sensor_3 = digitalRead(SENSOR_LINE_3_PIN);
 }
 bool Line_Sensor_4;
 void ChangeSensor4() {
+  bool SituationChange = true;
   Line_Sensor_4 = digitalRead(SENSOR_LINE_4_PIN);
 }
 bool Line_Sensor_5;
 void ChangeSensor5() {
+  bool SituationChange = true;
   Line_Sensor_5 = digitalRead(SENSOR_LINE_5_PIN);
 }
+// read sensors variables
+// if the interupts are triggered it will also raise a flag SituationChange, which just tells us that a sensor changed.
+// please reset SituationChange to false, after the new situation has been handled, otherwise it is a cause of bugs
 //------------------------------------------------------------
 
 //---------------VARIABLES_FOR_MOTORS-------------------------
@@ -77,6 +87,7 @@ void IRAM_ATTR SonicSensorTrigger();
 void PWMA();
 void PWMB();
 //------------------------------------------------------------
+
 void setup() {
   // setup for pins of buttons
   pinMode(LEFT_BUTTON,INPUT_PULLUP);
@@ -173,3 +184,4 @@ void PWMB() {
         completeB = true;
     }
 }
+
