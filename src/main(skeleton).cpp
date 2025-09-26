@@ -162,6 +162,8 @@ void loop() {
   tft.printf("Line sensors: %d, %d, %d, %d, %d     ",Line_Sensor_1,Line_Sensor_2,Line_Sensor_3,Line_Sensor_4,Line_Sensor_5);
   tft.setCursor(0,30);
   tft.printf("Sonic Distance: 1-%i, 2-%i    ",dist1,dist2);
+  tft.setCursor(0,60);
+  tft.printf("Motor Mode: A-%i, B-%i     ",modeA,modeB);
 
   PWMA();
   PWMB();
@@ -233,4 +235,5 @@ void SonicSense() {
   digitalWrite(SONIC_OUT_PIN,HIGH);
   timerAlarmEnable(SonicTriggerTimer);
 }
+
 
