@@ -43,27 +43,27 @@ bool SituationChange = false;
 
 bool Line_Sensor_1;
 void ChangeSensor1() {
-  bool SituationChange = true;
+  SituationChange = true;
   Line_Sensor_1 = digitalRead(SENSOR_LINE_1_PIN);
 }
 bool Line_Sensor_2;
 void ChangeSensor2() {
-  bool SituationChange = true;
+  SituationChange = true;
   Line_Sensor_2 = digitalRead(SENSOR_LINE_2_PIN);
 }
 bool Line_Sensor_3;
 void ChangeSensor3() {
-  bool SituationChange = true;
+  SituationChange = true;
   Line_Sensor_3 = digitalRead(SENSOR_LINE_3_PIN);
 }
 bool Line_Sensor_4;
 void ChangeSensor4() {
-  bool SituationChange = true;
+  SituationChange = true;
   Line_Sensor_4 = digitalRead(SENSOR_LINE_4_PIN);
 }
 bool Line_Sensor_5;
 void ChangeSensor5() {
-  bool SituationChange = true;
+  SituationChange = true;
   Line_Sensor_5 = digitalRead(SENSOR_LINE_5_PIN);
 }
 // read sensors variables
@@ -72,7 +72,7 @@ void ChangeSensor5() {
 //------------------------------------------------------------
 
 //---------------VARIABLES_FOR_MOTORS-------------------------
-int Modes[3] = {2000,10000,20000};
+int Modes[3] = {0,10000,20000};
 // int UIModes[3] = {10,50,100};
 
 bool completeA = true;
@@ -168,7 +168,7 @@ void loop() {
   PWMA();
   PWMB();
 
-  if((dist1 || dist2) < 30) {
+  if(dist1 < 30 ||  dist2 < 30) {
     modeA = 2;
     modeB = 2;
   } else {
@@ -221,7 +221,7 @@ void SonicDistance2() {
   if(digitalRead(SONIC_IN_PIN2) == HIGH) {
     StartTime2 = micros();
   } else {
-    int EchoTime2 = micros() - StartTime1;
+    int EchoTime2 = micros() - StartTime2;
     dist2 = (EchoTime2 * 0.0343)/2;
   }
 }
@@ -235,5 +235,3 @@ void SonicSense() {
   digitalWrite(SONIC_OUT_PIN,HIGH);
   timerAlarmEnable(SonicTriggerTimer);
 }
-
-
