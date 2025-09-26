@@ -159,11 +159,20 @@ void loop() {
   tft.setTextColor(TFT_RED,TFT_BLUE);
   tft.setTextSize(5);
   tft.setCursor(0,0);
-  tft.printf("");
+  tft.printf("Line sensors: %d, %d, %d, %d, %d     ",Line_Sensor_1,Line_Sensor_2,Line_Sensor_3,Line_Sensor_4,Line_Sensor_5);
+  tft.setCursor(0,30);
+  tft.printf("Sonic Distance: 1-%i, 2-%i    ",dist1,dist2);
 
   PWMA();
   PWMB();
 
+  if((dist1 || dist2) < 30) {
+    modeA = 2;
+    modeB = 2;
+  } else {
+    modeA = 0;
+    modeB = 0;
+  }
 
 }
 
@@ -224,3 +233,4 @@ void SonicSense() {
   digitalWrite(SONIC_OUT_PIN,HIGH);
   timerAlarmEnable(SonicTriggerTimer);
 }
+
