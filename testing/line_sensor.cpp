@@ -4,8 +4,8 @@
 
 #define LEFT_BUTTON 0
 #define RIGHT_BUTTON 14
-#define LineAPin 1
-#define LineDPin 2
+#define LineAPin 3
+#define LineDPin 1
 
 
 

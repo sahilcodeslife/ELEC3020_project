@@ -42,27 +42,27 @@ float dist2;
 bool SituationChange = false;
 
 bool Line_Sensor_1;
-void ChangeSensor1() {
+void IRAM_ATTR ChangeSensor1() {
   SituationChange = true;
   Line_Sensor_1 = digitalRead(SENSOR_LINE_1_PIN);
 }
 bool Line_Sensor_2;
-void ChangeSensor2() {
+void IRAM_ATTR ChangeSensor2() {
   SituationChange = true;
   Line_Sensor_2 = digitalRead(SENSOR_LINE_2_PIN);
 }
 bool Line_Sensor_3;
-void ChangeSensor3() {
+void IRAM_ATTR ChangeSensor3() {
   SituationChange = true;
   Line_Sensor_3 = digitalRead(SENSOR_LINE_3_PIN);
 }
 bool Line_Sensor_4;
-void ChangeSensor4() {
+void IRAM_ATTR ChangeSensor4() {
   SituationChange = true;
   Line_Sensor_4 = digitalRead(SENSOR_LINE_4_PIN);
 }
 bool Line_Sensor_5;
-void ChangeSensor5() {
+void IRAM_ATTR ChangeSensor5() {
   SituationChange = true;
   Line_Sensor_5 = digitalRead(SENSOR_LINE_5_PIN);
 }
@@ -97,6 +97,9 @@ void SonicDistance2();
 void SonicSense();
 //------------------------------------------------------------
 void setup() {
+  //debugging
+  Serial.begin(115200);
+
   // setup for pins of buttons
   pinMode(LEFT_BUTTON,INPUT_PULLUP);
   pinMode(RIGHT_BUTTON,INPUT_PULLUP);
@@ -107,6 +110,9 @@ void setup() {
   tft.fillScreen(TFT_BLUE);  // Set screen to all blue
 
   //---------------SETUP_FOR_LINE_SENSORS-------------------------
+  ////declare each as input
+  pinMode(SENSOR_LINE_2_PIN,INPUT);
+  pinMode(SENSOR_LINE_3_PIN,INPUT);
   Line_Sensor_1 = digitalRead(SENSOR_LINE_1_PIN);
   attachInterrupt(SENSOR_LINE_1_PIN,ChangeSensor1,CHANGE);
   Line_Sensor_2 = digitalRead(SENSOR_LINE_2_PIN);
@@ -156,8 +162,9 @@ void setup() {
 }
 
 void loop() {
-  tft.setTextColor(TFT_RED,TFT_BLUE);
-  tft.setTextSize(5);
+  Serial.print(Line_Sensor_3);
+  tft.setTextColor(TFT_GREEN,TFT_BLACK);
+  tft.setTextSize(2);
   tft.setCursor(0,0);
   tft.printf("Line sensors: %d, %d, %d, %d, %d     ",Line_Sensor_1,Line_Sensor_2,Line_Sensor_3,Line_Sensor_4,Line_Sensor_5);
   tft.setCursor(0,30);
