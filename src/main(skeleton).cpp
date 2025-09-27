@@ -95,6 +95,9 @@ void PWMB();
 void SonicDistance1();
 void SonicDistance2();
 void SonicSense();
+void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Sensor_4, int Line_Sensor_5,
+            int dist1, int dist2, int modeA, int modeB);
+
 //------------------------------------------------------------
 void setup() {
   //debugging
@@ -107,7 +110,7 @@ void setup() {
   // initilises the screen and general setup
   tft.init(); // start screen
   tft.setRotation(1); //Set screen orientation
-  tft.fillScreen(TFT_BLUE);  // Set screen to all blue
+  tft.fillScreen(TFT_WHITE);  // Set screen to all blue
 
   //---------------SETUP_FOR_LINE_SENSORS-------------------------
   ////declare each as input
@@ -163,15 +166,18 @@ void setup() {
 
 void loop() {
   Serial.print(Line_Sensor_3);
-  tft.setTextColor(TFT_GREEN,TFT_BLACK);
-  tft.setTextSize(2);
+  /*tft.setTextColor(TFT_GREEN,TFT_BLACK);
+  tft.setTextSize(1.2);
   tft.setCursor(0,0);
-  tft.printf("Line sensors: %d, %d, %d, %d, %d     ",Line_Sensor_1,Line_Sensor_2,Line_Sensor_3,Line_Sensor_4,Line_Sensor_5);
-  tft.setCursor(0,30);
+  tft.printf("Line: 1:%d, 2:%d, 3:%d, 4:%d, 5:%d     ",Line_Sensor_1,Line_Sensor_2,Line_Sensor_3,Line_Sensor_4,Line_Sensor_5);
+  tft.setCursor(0,40);
   tft.printf("Sonic Distance: 1-%i, 2-%i    ",dist1,dist2);
-  tft.setCursor(0,60);
+  tft.setCursor(0,70);
   tft.printf("Motor Mode: A-%i, B-%i     ",modeA,modeB);
-
+  */
+  drawUI(Line_Sensor_1, Line_Sensor_2, Line_Sensor_3, Line_Sensor_4, Line_Sensor_5,
+       dist1, dist2, modeA, modeB);
+  
   PWMA();
   PWMB();
 
@@ -241,4 +247,79 @@ void SonicSense() {
   timerRestart(SonicTriggerTimer);
   digitalWrite(SONIC_OUT_PIN,HIGH);
   timerAlarmEnable(SonicTriggerTimer);
+}
+
+//beautiful GUI helper. 
+void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Sensor_4, int Line_Sensor_5,
+            int dist1, int dist2, int modeA, int modeB) {
+  
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+
+  // --- Line Sensors (top row as circles) ---
+  int y = 20;
+  int spacing = 60;
+  int r = 12;
+  uint16_t active = TFT_BLACK, inactive = TFT_WHITE;
+  
+  tft.setTextDatum(MC_DATUM);
+   
+  tft.fillCircle(20 + 0*spacing, y, r, Line_Sensor_1 ? active : inactive);
+  tft.drawCircle(20+ 0*spacing, y,r,TFT_BLACK);
+  tft.setTextColor(Line_Sensor_1 ? TFT_WHITE : TFT_BLACK);
+  tft.drawNumber(1, 20 + 0*spacing, y);
+
+  tft.fillCircle(20 + 1*spacing, y, r, Line_Sensor_2 ? active : inactive);
+  tft.drawCircle(20+ 1*spacing, y,r,TFT_BLACK);
+  tft.setTextColor(Line_Sensor_2 ? TFT_WHITE : TFT_BLACK);
+  tft.drawNumber(2, 20 + 1*spacing, y);
+
+  tft.fillCircle(20 + 2*spacing, y, r, Line_Sensor_3 ? active : inactive);
+  tft.drawCircle(20+ 2*spacing, y,r,TFT_BLACK);
+  tft.setTextColor(Line_Sensor_3 ? TFT_WHITE : TFT_BLACK);
+  tft.drawNumber(3, 20 + 2*spacing, y);
+
+  tft.fillCircle(20 + 3*spacing, y, r, Line_Sensor_4 ? active : inactive);
+  tft.drawCircle(20+ 3*spacing, y,r,TFT_BLACK);
+  tft.setTextColor(Line_Sensor_4 ? TFT_WHITE : TFT_BLACK);
+  tft.drawNumber(4, 20 + 3*spacing, y);
+
+  tft.fillCircle(20 + 4*spacing, y, r, Line_Sensor_5 ? active : inactive);
+  tft.drawCircle(20+ 4*spacing, y,r,TFT_BLACK);
+  tft.setTextColor(Line_Sensor_5 ? TFT_WHITE : TFT_BLACK);
+  tft.drawNumber(5, 20 + 4*spacing, y);
+  
+  tft.setCursor(10, y + 20);
+  tft.print("Line Sensors");
+
+  // --- Ultrasonic Distances (bars) ---
+  int maxDist = 100;  // cm scale
+  int barWidth = 100;
+  int barHeight = 12;
+  
+  // Dist1 bar
+  int w1 = map(dist1, 0, maxDist, 0, barWidth);
+  tft.drawRect(20, 60, barWidth, barHeight, TFT_WHITE);
+  tft.fillRect(20, 60, w1, barHeight, TFT_BLUE);
+  tft.setCursor(130, 60);
+  tft.printf("D1:%icm", dist1);
+
+  // Dist2 bar
+  int w2 = map(dist2, 0, maxDist, 0, barWidth);
+  tft.drawRect(20, 80, barWidth, barHeight, TFT_WHITE);
+  tft.fillRect(20, 80, w2, barHeight, TFT_BLUE);
+  tft.setCursor(130, 80);
+  tft.printf("D2:%icm", dist2);
+
+  // --- Motor Modes (colored boxes) ---
+  int boxW = 60, boxH = 30;
+  
+  tft.fillRoundRect(20, 120, boxW, boxH, 5, (modeA) ? TFT_GREEN : TFT_DARKGREY);
+  tft.setCursor(30, 130);
+  tft.setTextColor(TFT_BLACK);
+  tft.printf("A:%i", modeA);
+
+  tft.fillRoundRect(100, 120, boxW, boxH, 5, (modeB) ? TFT_GREEN : TFT_DARKGREY);
+  tft.setCursor(110, 130);
+  tft.printf("B:%i", modeB);
 }
