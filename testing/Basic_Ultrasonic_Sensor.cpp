@@ -7,8 +7,8 @@
 TFT_eSPI tft = TFT_eSPI();
 
 //--------------------------------------
-#define US_SENSOR_TRIGGER_PIN 10 // an output
-#define US_ECHO_RECEIVER_PIN 11 // an input
+#define US_SENSOR_TRIGGER_PIN 18 // an output
+#define US_ECHO_RECEIVER_PIN 44 // an input
 
 #define TIME_UNTIL_RESET 12000 // in microseconds the equation is distance(cm) = (time(us) * 0.0343)/2, 12000 is about 2 metres
 //--------------------------------------

@@ -14,8 +14,8 @@
 
 //-----------------DEFINING_ULTRASONIC_SENSORS--------------
 #define SONIC_OUT_PIN 18
-#define SONIC_IN_PIN1 43
-#define SONIC_IN_PIN2 44
+#define SONIC_IN_PIN1 44
+// #define SONIC_IN_PIN2 44
 #define SONIC_REFRESH_RATE 12000 // max distance of about 2 meters
 //----------------------------------------------------------
 
@@ -30,12 +30,15 @@
 TFT_eSPI tft = TFT_eSPI();
 
 //----------VARIABLES_FOR_ULTRASONIC_SENSORS----------------
-hw_timer_t *SonicTriggerTimer = NULL;
-hw_timer_t *SonicRefreshTimer = NULL;
+//hw_timer_t *SonicTriggerTimer = NULL;
+//hw_timer_t *SonicRefreshTimer = NULL;
+bool USready = true;
 int StartTime1;
-int StartTime2;
+int EchoTime1;
 float dist1;
-float dist2;
+unsigned long lastTrigger = 0;
+//int StartTime2;
+//float dist2;
 //----------------------------------------------------------
 
 //------------VARIABLES_FOR_LINE_SENSORS-------------------
@@ -96,7 +99,7 @@ void SonicDistance1();
 void SonicDistance2();
 void SonicSense();
 void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Sensor_4, int Line_Sensor_5,
-            int dist1, int dist2, int modeA, int modeB);
+            int dist1, /*int dist2,*/ int modeA, int modeB);
 
 //------------------------------------------------------------
 void setup() {
@@ -132,19 +135,19 @@ void setup() {
   //--------------SETUP_FOR_ULTRASONIC_SENSORS------------------------
   pinMode(SONIC_OUT_PIN,OUTPUT);
   pinMode(SONIC_IN_PIN1,INPUT_PULLUP);
-  pinMode(SONIC_IN_PIN2,INPUT_PULLUP);
+  //pinMode(SONIC_IN_PIN2,INPUT_PULLUP);
 
-  SonicTriggerTimer = timerBegin(0,80,true);
-  SonicRefreshTimer = timerBegin(0,80,true);
-  timerAttachInterrupt(SonicTriggerTimer,SonicSensorTrigger,true);
-  timerAttachInterrupt(SonicRefreshTimer,SonicSense,true);
-  timerAlarmWrite(SonicTriggerTimer,10,false);
-  timerAlarmWrite(SonicRefreshTimer,SONIC_REFRESH_RATE,true);
+  //SonicTriggerTimer = timerBegin(0,80,true);
+  //SonicRefreshTimer = timerBegin(0,80,true);
+  //timerAttachInterrupt(SonicTriggerTimer,SonicSensorTrigger,true);
+  //timerAttachInterrupt(SonicRefreshTimer,SonicSense,true);
+  //timerAlarmWrite(SonicTriggerTimer,10,false);
+  //timerAlarmWrite(SonicRefreshTimer,SONIC_REFRESH_RATE,true);
   attachInterrupt(SONIC_IN_PIN1,SonicDistance1,CHANGE);
-  attachInterrupt(SONIC_IN_PIN2,SonicDistance2,CHANGE);
+  //attachInterrupt(SONIC_IN_PIN2,SonicDistance2,CHANGE);
 
-  timerRestart(SonicRefreshTimer);
-  timerAlarmEnable(SonicRefreshTimer);
+  //timerRestart(SonicRefreshTimer);
+  //timerAlarmEnable(SonicRefreshTimer);
 
   // use these commands to run the timer and trigger the ultrasonic sensors
   // timerRestart(SonicTriggerTimer);
@@ -163,9 +166,25 @@ void setup() {
 
   //-------------------------------------------------------------
 }
+void USTrigger() {
+  digitalWrite(SONIC_OUT_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(SONIC_OUT_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(SONIC_OUT_PIN, LOW);
+}
+
 
 void loop() {
-  Serial.print(Line_Sensor_3);
+  if (USready || (micros()-lastTrigger > 50000)) {
+    USready = false;
+    lastTrigger = micros();
+    USTrigger();
+  }
+
+  Serial.print("Ultrasonic distance: ");
+  Serial.print(dist1);
+  Serial.println(" cm");
   /*tft.setTextColor(TFT_GREEN,TFT_BLACK);
   tft.setTextSize(1.2);
   tft.setCursor(0,0);
@@ -176,12 +195,12 @@ void loop() {
   tft.printf("Motor Mode: A-%i, B-%i     ",modeA,modeB);
   */
   drawUI(Line_Sensor_1, Line_Sensor_2, Line_Sensor_3, Line_Sensor_4, Line_Sensor_5,
-       dist1, dist2, modeA, modeB);
+       dist1, /*dist2,*/ modeA, modeB);
   
   PWMA();
   PWMB();
 
-  if(dist1 < 30 ||  dist2 < 30) {
+  if(dist1 < 30 /*||  dist2 < 30*/) {
     modeA = 2;
     modeB = 2;
   } else {
@@ -221,16 +240,18 @@ void PWMB() {
     }
 }
 
-void SonicDistance1() {
+void IRAM_ATTR SonicDistance1() {
   if(digitalRead(SONIC_IN_PIN1) == HIGH) {
     StartTime1 = micros();
   } else {
     int EchoTime1 = micros() - StartTime1;
     dist1 = (EchoTime1 * 0.0343)/2;
+    USready = true;
   }
+  
 }
 
-void SonicDistance2() {
+/*void SonicDistance2() {
   if(digitalRead(SONIC_IN_PIN2) == HIGH) {
     StartTime2 = micros();
   } else {
@@ -238,20 +259,20 @@ void SonicDistance2() {
     dist2 = (EchoTime2 * 0.0343)/2;
   }
 }
-
-void IRAM_ATTR SonicSensorTrigger() {
+*/
+/*void IRAM_ATTR SonicSensorTrigger() {
   digitalWrite(SONIC_OUT_PIN,LOW);
-}
+}*/
 
-void SonicSense() {
+/*void SonicSense() {
   timerRestart(SonicTriggerTimer);
   digitalWrite(SONIC_OUT_PIN,HIGH);
   timerAlarmEnable(SonicTriggerTimer);
-}
+}*/
 
 //beautiful GUI helper. 
 void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Sensor_4, int Line_Sensor_5,
-            int dist1, int dist2, int modeA, int modeB) {
+            int dist1, /*int dist2,*/ int modeA, int modeB) {
   
   tft.setTextDatum(TL_DATUM);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
@@ -292,7 +313,36 @@ void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Se
   tft.setCursor(10, y + 20);
   tft.print("Line Sensors");
 
-  // --- Ultrasonic Distances (bars) ---
+  // --- Ultrasonic Distance (new red bar) ---
+  int maxDist = 100;   // max distance in cm for scale
+  int barX = 20;
+  int barY = 60;
+  int barW = 200;
+  int barH = 40;
+
+  // Closer = more fill
+  int fillW = map(constrain(dist1, 0, maxDist), maxDist, 0, 0, barW);
+
+  // Draw outline
+  tft.drawRect(barX, barY, barW, barH, TFT_BLACK);
+
+  // Fill proportional red
+  tft.fillRect(barX, barY, fillW, barH, TFT_RED);
+
+  // Distance text in center
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextFont(4);
+  tft.setTextSize(1);
+
+  uint16_t textColor = (fillW > barW / 2) ? TFT_WHITE : TFT_BLACK;
+  tft.setTextColor(textColor, TFT_WHITE);
+
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%icm", (int)dist1);
+  tft.drawString(buf, barX + barW / 2, barY + barH / 2);
+
+  // --- Old ultrasonic bars (commented out) ---
+  /*
   int maxDist = 100;  // cm scale
   int barWidth = 100;
   int barHeight = 12;
@@ -303,13 +353,7 @@ void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Se
   tft.fillRect(20, 60, w1, barHeight, TFT_BLUE);
   tft.setCursor(130, 60);
   tft.printf("D1:%icm", dist1);
-
-  // Dist2 bar
-  int w2 = map(dist2, 0, maxDist, 0, barWidth);
-  tft.drawRect(20, 80, barWidth, barHeight, TFT_WHITE);
-  tft.fillRect(20, 80, w2, barHeight, TFT_BLUE);
-  tft.setCursor(130, 80);
-  tft.printf("D2:%icm", dist2);
+  */
 
   // --- Motor Modes (colored boxes) ---
   int boxW = 60, boxH = 30;
