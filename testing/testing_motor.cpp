@@ -2,19 +2,19 @@
 #include <TFT_eSPI.h>
 
 // Motor A pins
-#define AIN1 18
-#define AIN2 17
-#define PWMA 12
+#define AIN1 44
+#define AIN2 43
+#define PWMA 17
 
 // Motor B pins
-#define BIN1 16
-#define BIN2 1
-#define PWMB 13
+#define BIN1 1
+#define BIN2 2
+#define PWMB 3
 
 #define STBY 21
 
 // Ultrasonic sensor pins
-#define TRIG 43
+#define TRIG 18
 #define ECHO 44
 
 // PWM settings
@@ -88,22 +88,28 @@ void motorStop() {
 }
 
 void loop() {
-    long distance = getDistanceCM();
+    
+    motorAForward(220);
+    tft.setCursor(10, 10);
+    tft.printf("%i",millis());
+ 
+    
+    // long distance = getDistanceCM();
 
-    tft.fillRect(0, 0, 240, 40, TFT_BLACK);  // clear text area
+    // tft.fillRect(0, 0, 240, 40, TFT_BLACK);  // clear text area
 
-    if (distance > 0 && distance < 20) {
-        motorAForward(220);
-        motorBForward(220);
+    // if (true) {
+    //     motorAForward(220);
+    //     motorBForward(220);
 
-        tft.setCursor(10, 10);
-        tft.printf("Object detected%i",distance);
-    } else {
-        motorStop();
+    //     tft.setCursor(10, 10);
+    //     tft.printf("Object detected%i",distance);
+    // } else {
+    //     motorStop();
 
-        tft.setCursor(10, 10);
-        tft.print("No object");
-    }
+    //     tft.setCursor(10, 10);
+    //     tft.print("No object");
+    // }
 
-    delay(200);
+    // delay(200);
 }
