@@ -100,6 +100,12 @@ void USTrigger();
 //------------------------------------------------------------
 
 void setup() {
+  //enable backlight over battery 
+  pinMode(15, OUTPUT);
+  digitalWrite(15, HIGH);
+
+
+
   //debugging
   Serial.begin(115200);
 
