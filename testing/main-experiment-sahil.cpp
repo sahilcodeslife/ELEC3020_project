@@ -16,7 +16,7 @@
 #define SONIC_OUT_PIN 12
 #define SONIC_IN_PIN1 43
 #define SONIC_REFRESH_RATE 12000 // max distance ~2m
-#define ARENA_DIAMETER 50 // Test arena diameter in cm
+#define ARENA_DIAMETER 100 // Test arena diameter in cm
 //----------------------------------------------------------
 
 //-----------DEFINING_MOTORS (TB6612FNG)-------------------
@@ -83,7 +83,7 @@ int BDirection = 0;
 void IRAM_ATTR SonicDistance1();
 void USTrigger();
 void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Sensor_4, int Line_Sensor_5,
-            int dist1, int modeA, int modeB);
+            int dist1, int modeA, int modeB, int mode);
 
 void setMotor(int motor, int direction, int duty) {
   if (motor == 0) { // A
@@ -166,10 +166,17 @@ void setup() {
 #define BLIND_MODE 4
 #define MOTOR_FORWARDS 0
 #define MOTOR_BACKWARDS 1
+#define ATTACK_THRESHOLD 25 // Distance for entering ATTACK_MODE (cm)
+#define ATTACK_CHECK_INTERVAL 1500 // Check distance every 1500ms in ATTACK_MODE
+#define CLOSE_RANGE_THRESHOLD 3 // Distance for detecting head-on collision (cm)
+#define BACKUP_DURATION 1500 // Duration to back up when too close (ms)
 
 int mode = IDLE_MODE; // Start in IDLE_MODE
 int timeofaction;
+unsigned long lastAttackCheck = 0; // Timer for periodic distance checks in ATTACK_MODE
+unsigned long backupStartTime = 0; // Timer for backup duration
 bool crisisaverted = true;
+bool isBackingUp = false; // Flag to track backup state
 //-------------------------------------------------------------------------------------
 
 void loop() {
@@ -188,7 +195,7 @@ void loop() {
 
   // Update GUI
   drawUI(Line_Sensor_1, Line_Sensor_2, Line_Sensor_3, Line_Sensor_4, Line_Sensor_5,
-         dist1, AMotorDuty, BMotorDuty);
+         dist1, AMotorDuty, BMotorDuty, mode);
 
   // Update motors if duty changed
   if (AMotorDutyCurrent != AMotorDuty || BMotorDutyCurrent != BMotorDuty) {
@@ -211,65 +218,115 @@ void loop() {
   // Normal operation logic
   int dangerlevel = Line_Sensor_1 + Line_Sensor_2 + Line_Sensor_3 + Line_Sensor_4 + Line_Sensor_5;
 
-  // Mode logic
-  if (dangerlevel == 0) { // All sensors white, safe
+  // Mode logic with DEFENCE_MODE as highest priority
+  if (dangerlevel > 0) { // Any sensor black, edge detected
+    mode = DEFENCE_MODE;
+    isBackingUp = false; // Reset backup state
+  } else if (dist1 >= 100) { // Opponent far, scaled for small arena
+    mode = SEARCH_MODE;
+    isBackingUp = false; // Reset backup state
+  } else if (dist1 <= ATTACK_THRESHOLD && !isBackingUp) { // Enter ATTACK_MODE if no black lines and opponent close
     mode = ATTACK_MODE;
     crisisaverted = false;
-  } else if (dangerlevel > 0) { // Any sensor black, edge detected
-    mode = DEFENCE_MODE;
-  }
-  if (dist1 >= 60) { // Opponent far, scaled for small arena
-    mode = SEARCH_MODE;
-  }
-  if (mode == SEARCH_MODE && dangerlevel == 0 && dist1 <= 30) {
-    mode = ATTACK_MODE;
+  } else {
+    mode = SEARCH_MODE; // Default to SEARCH_MODE
+    isBackingUp = false; // Reset backup state
   }
 
   if (mode == ATTACK_MODE) {
-    if (dist1 < 40) {
-      ADirection = MOTOR_FORWARDS;
-      BDirection = MOTOR_FORWARDS;
-      AMotorDuty = 200;
-      BMotorDuty = 200;
-    }
-  } else if (mode == DEFENCE_MODE) {
-    if (millis() - timeofaction >= 2000 && crisisaverted == true) {
-      crisisaverted = false; // Allow new action after 2s cooldown
-    }
-    if (!crisisaverted) { // Fixed comparison
-      if (Line_Sensor_3 == LINE_SENSOR_BLACK && Line_Sensor_4 == LINE_SENSOR_BLACK) {
+    if (isBackingUp) {
+      // Continue backing up until duration is complete
+      if (millis() - backupStartTime < BACKUP_DURATION) {
+        ADirection = MOTOR_BACKWARDS;
+        BDirection = MOTOR_FORWARDS;
+        AMotorDuty = 200;
+        BMotorDuty = 100;
+      } else {
+        // Backup complete, switch to SEARCH_MODE
+        isBackingUp = false;
+        mode = SEARCH_MODE;
+        lastAttackCheck = millis(); // Reset attack check timer
+      }
+    } else {
+      // Periodically switch to SEARCH_MODE to check distance
+      if (millis() - lastAttackCheck >= ATTACK_CHECK_INTERVAL) {
+        mode = SEARCH_MODE;
+        lastAttackCheck = millis();
+      } else if (dist1 < CLOSE_RANGE_THRESHOLD) {
+        // Opponent too close (<3cm), start backing up
+        isBackingUp = true;
+        backupStartTime = millis();
         ADirection = MOTOR_BACKWARDS;
         BDirection = MOTOR_BACKWARDS;
-        AMotorDuty = 255;
-        BMotorDuty = 20; // Pivot turn
-        timeofaction = millis();
-        crisisaverted = true;
-      } else if (Line_Sensor_2 == LINE_SENSOR_BLACK) {
-        ADirection = MOTOR_FORWARDS;
-        BDirection = MOTOR_FORWARDS;
-        BMotorDuty = 200;
-        AMotorDuty = 100; // Turn left
-        timeofaction = millis();
-        crisisaverted = true;
-      } else if (Line_Sensor_5 == LINE_SENSOR_BLACK) {
-        ADirection = MOTOR_FORWARDS;
-        BDirection = MOTOR_FORWARDS;
+        AMotorDuty = 200;
         BMotorDuty = 100;
-        AMotorDuty = 200; // Turn right
-        timeofaction = millis();
-        crisisaverted = true;
-      } else if (Line_Sensor_3 == LINE_SENSOR_BLACK || Line_Sensor_4 == LINE_SENSOR_BLACK) {
+      } else if (dist1 < ATTACK_THRESHOLD) {
+        // Normal attack forward
         ADirection = MOTOR_FORWARDS;
         BDirection = MOTOR_FORWARDS;
         AMotorDuty = 200;
-        BMotorDuty = 200; // Push forward
+        BMotorDuty = 200;
+      }
+    }
+  } else if (mode == DEFENCE_MODE) {
+    if (millis() - timeofaction >= 1000 && crisisaverted == true) {
+      crisisaverted = false; // Allow new action after 1s cooldown
+    }
+    if (!crisisaverted) {
+      if (Line_Sensor_3 == LINE_SENSOR_BLACK && Line_Sensor_4 == LINE_SENSOR_BLACK) {
+        // Both back sensors detect edge: Pivot turn
+        ADirection = MOTOR_BACKWARDS;
+        BDirection = MOTOR_BACKWARDS;
+        AMotorDuty = 255;
+        BMotorDuty = 20;
         timeofaction = millis();
         crisisaverted = true;
       } else if (Line_Sensor_1 == LINE_SENSOR_BLACK) {
+        // Front sensor detects edge: Sharp backwards
         ADirection = MOTOR_BACKWARDS;
         BDirection = MOTOR_BACKWARDS;
-        AMotorDuty = 200 - Line_Sensor_2 * 100;
-        BMotorDuty = 200 - Line_Sensor_5 * 100; // Variable back turn
+        AMotorDuty = 255;
+        BMotorDuty = 255;
+        timeofaction = millis();
+        crisisaverted = true;
+      } else if (Line_Sensor_1 == LINE_SENSOR_BLACK && Line_Sensor_2 == LINE_SENSOR_BLACK) {
+        // Front and right sensors detect edge: Back left turn
+        ADirection = MOTOR_BACKWARDS;
+        BDirection = MOTOR_BACKWARDS;
+        AMotorDuty = 200;
+        BMotorDuty = 100;
+        timeofaction = millis();
+        crisisaverted = true;
+      } else if (Line_Sensor_1 == LINE_SENSOR_BLACK && Line_Sensor_5 == LINE_SENSOR_BLACK) {
+        // Front and left sensors detect edge: Back right turn
+        ADirection = MOTOR_BACKWARDS;
+        BDirection = MOTOR_BACKWARDS;
+        AMotorDuty = 100;
+        BMotorDuty = 200;
+        timeofaction = millis();
+        crisisaverted = true;
+      } else if (Line_Sensor_2 == LINE_SENSOR_BLACK) {
+        // Right sensor detects edge: Turn left
+        ADirection = MOTOR_FORWARDS;
+        BDirection = MOTOR_FORWARDS;
+        BMotorDuty = 200;
+        AMotorDuty = 100;
+        timeofaction = millis();
+        crisisaverted = true;
+      } else if (Line_Sensor_5 == LINE_SENSOR_BLACK) {
+        // Left sensor detects edge: Turn right
+        ADirection = MOTOR_FORWARDS;
+        BDirection = MOTOR_FORWARDS;
+        BMotorDuty = 100;
+        AMotorDuty = 200;
+        timeofaction = millis();
+        crisisaverted = true;
+      } else if (Line_Sensor_3 == LINE_SENSOR_BLACK || Line_Sensor_4 == LINE_SENSOR_BLACK) {
+        // Either back sensor detects edge: Push forward
+        ADirection = MOTOR_FORWARDS;
+        BDirection = MOTOR_FORWARDS;
+        AMotorDuty = 200;
+        BMotorDuty = 200;
         timeofaction = millis();
         crisisaverted = true;
       }
@@ -277,8 +334,8 @@ void loop() {
   } else if (mode == SEARCH_MODE) {
     ADirection = MOTOR_BACKWARDS;
     BDirection = MOTOR_FORWARDS;
-    AMotorDuty = 80; // Increased for motor reliability
-    BMotorDuty = 80;
+    AMotorDuty = 170;
+    BMotorDuty = 170;
   }
   // BLIND_MODE remains empty
 
@@ -302,14 +359,14 @@ void IRAM_ATTR SonicDistance1() {
     int EchoTime1 = micros() - StartTime1;
     dist1 = (EchoTime1 * 0.0343) / 2;
     if (dist1 > ARENA_DIAMETER) {
-      dist1 = 60; // Cap to trigger SEARCH_MODE for small arena
+      dist1 = 100; // Cap to trigger SEARCH_MODE for arena
     }
     USready = true;
   }
 }
 
 void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Sensor_4, int Line_Sensor_5,
-            int dist1, int modeA, int modeB) {
+            int dist1, int modeA, int modeB, int mode) {
   tft.setTextDatum(TL_DATUM);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
 
@@ -379,5 +436,26 @@ void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Se
 
   tft.fillRoundRect(100, 120, boxW, boxH, 5, (modeB) ? TFT_GREEN : TFT_DARKGREY);
   tft.setCursor(110, 130);
+  tft.setTextColor(TFT_BLACK);
   tft.printf("B:%i", modeB);
+
+  // Display current mode
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextFont(4);
+  tft.setTextSize(1);
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  // Clear previous mode text to avoid overlap
+  tft.fillRect(160, 100, 200, 20, TFT_WHITE);
+  const char* modeStr;
+  switch (mode) {
+    case IDLE_MODE: modeStr = "IDLE"; break;
+    case ATTACK_MODE: modeStr = "ATTACK"; break;
+    case DEFENCE_MODE: modeStr = "DEFENCE"; break;
+    case SEARCH_MODE: modeStr = "SEARCH"; break;
+    case BLIND_MODE: modeStr = "BLIND"; break;
+    default: modeStr = "UNKNOWN"; break;
+  }
+  tft.setCursor(160, 100);
+  tft.print("Mode: ");
+  tft.print(modeStr);
 }

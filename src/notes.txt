@@ -1,0 +1,2 @@
+* if any going black, it goes to defense mode
+* in defence mode depending on which one is balck it make AN appropriate manovaer. 

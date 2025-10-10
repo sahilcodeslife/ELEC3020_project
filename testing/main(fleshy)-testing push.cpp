@@ -16,7 +16,6 @@
 #define SONIC_OUT_PIN 12
 #define SONIC_IN_PIN1 43
 #define SONIC_REFRESH_RATE 12000 // max distance ~2m
-#define ARENA_DIAMETER 50 // Test arena diameter in cm
 //----------------------------------------------------------
 
 //-----------DEFINING_MOTORS (TB6612FNG)-------------------
@@ -79,19 +78,11 @@ int ADirection = 0;
 int BDirection = 0;
 //------------------------------------------------------------
 
-//---------------VARIABLES_FOR_PUSH_MANEUVER------------------
-unsigned long pushStartTime = 0;
-bool inPushManeuver = false;
-#define PUSH_BACK_DURATION 500 // ms to back up straight
-#define SWEEP_BACK_DURATION 1500 // ms to sweep back in circle
-#define PUSH_THRESHOLD 10 // cm for "being pushed"
-//------------------------------------------------------------
-
 //-------------------------DEFINING_FUNCTIONS-----------------
 void IRAM_ATTR SonicDistance1();
 void USTrigger();
 void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Sensor_4, int Line_Sensor_5,
-            int dist1, int modeA, int modeB, int mode);
+            int dist1, int modeA, int modeB);
 
 void setMotor(int motor, int direction, int duty) {
   if (motor == 0) { // A
@@ -157,7 +148,7 @@ void setup() {
   pinMode(BIN2, OUTPUT);
   pinMode(PWMB, OUTPUT);
 
-  ledcSetup(A_LEDC_CHANNEL, 5000, 8); // Lowered to 5kHz for motor reliability
+  ledcSetup(A_LEDC_CHANNEL, 5000, 8);
   ledcAttachPin(PWMA, A_LEDC_CHANNEL);
   ledcSetup(B_LEDC_CHANNEL, 20000, 8);
   ledcAttachPin(PWMB, B_LEDC_CHANNEL);
@@ -196,7 +187,7 @@ void loop() {
 
   // Update GUI
   drawUI(Line_Sensor_1, Line_Sensor_2, Line_Sensor_3, Line_Sensor_4, Line_Sensor_5,
-         dist1, AMotorDuty, BMotorDuty, mode);
+         dist1, AMotorDuty, BMotorDuty);
 
   // Update motors if duty changed
   if (AMotorDutyCurrent != AMotorDuty || BMotorDutyCurrent != BMotorDuty) {
@@ -226,37 +217,15 @@ void loop() {
   } else if (dangerlevel > 0) { // Any sensor black, edge detected
     mode = DEFENCE_MODE;
   }
-  if (dist1 >= 60) { // Opponent far, scaled for small arena
+  if (dist1 >= 100) { // Opponent far
     mode = SEARCH_MODE;
   }
-  if (mode == SEARCH_MODE && dangerlevel == 0 && dist1 <= 30) {
+  if (mode == SEARCH_MODE && dangerlevel == 0 && dist1 <= 75) {
     mode = ATTACK_MODE;
   }
 
   if (mode == ATTACK_MODE) {
-    if (dist1 < PUSH_THRESHOLD) { // Being pushed (<10 cm)
-      inPushManeuver = true;
-      pushStartTime = millis();
-    }
-    if (inPushManeuver) {
-      if (millis() - pushStartTime < PUSH_BACK_DURATION) {
-        // Back up straight
-        ADirection = MOTOR_BACKWARDS;
-        BDirection = MOTOR_BACKWARDS;
-        AMotorDuty = 200;
-        BMotorDuty = 200;
-      } else if (millis() - pushStartTime < PUSH_BACK_DURATION + SWEEP_BACK_DURATION) {
-        // Backwards sweeping turn (circular path, e.g., left motor slower)
-        ADirection = MOTOR_BACKWARDS;
-        BDirection = MOTOR_BACKWARDS;
-        AMotorDuty = 200; // Left full
-        BMotorDuty = 100; // Right slower for curve
-      } else {
-        // End maneuver, go to SEARCH_MODE
-        inPushManeuver = false;
-        mode = SEARCH_MODE;
-      }
-    } else if (dist1 < 40) {
+    if (dist1 < 100) {
       ADirection = MOTOR_FORWARDS;
       BDirection = MOTOR_FORWARDS;
       AMotorDuty = 200;
@@ -307,14 +276,10 @@ void loop() {
   } else if (mode == SEARCH_MODE) {
     ADirection = MOTOR_BACKWARDS;
     BDirection = MOTOR_FORWARDS;
-    AMotorDuty = 80; // Increased for motor reliability
-    BMotorDuty = 80;
+    AMotorDuty = 50;
+    BMotorDuty = 50;
   }
   // BLIND_MODE remains empty
-
-  // Enforce minimum duty for motor reliability
-  if (AMotorDuty > 0 && AMotorDuty < 80) AMotorDuty = 80;
-  if (BMotorDuty > 0 && BMotorDuty < 80) BMotorDuty = 80;
 }
 
 void USTrigger() {
@@ -331,16 +296,12 @@ void IRAM_ATTR SonicDistance1() {
   } else {
     int EchoTime1 = micros() - StartTime1;
     dist1 = (EchoTime1 * 0.0343) / 2;
-    if (dist1 > ARENA_DIAMETER) {
-      dist1 = 60; // Cap to trigger SEARCH_MODE for small arena
-    }
     USready = true;
   }
 }
 
-//beautiful GUI helper. 
 void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Sensor_4, int Line_Sensor_5,
-            int dist1, int modeA, int modeB, int mode) {
+            int dist1, int modeA, int modeB) {
   tft.setTextDatum(TL_DATUM);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
 
@@ -351,33 +312,33 @@ void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Se
 
   tft.setTextDatum(MC_DATUM);
 
-  tft.fillCircle(20 + 0*spacing, y, r, Line_Sensor_1 ? active : inactive);
-  tft.drawCircle(20+ 0*spacing, y, r, TFT_BLACK);
+  tft.fillCircle(20 + 0 * spacing, y, r, Line_Sensor_1 ? active : inactive);
+  tft.drawCircle(20 + 0 * spacing, y, r, TFT_BLACK);
   tft.setTextColor(Line_Sensor_1 ? TFT_WHITE : TFT_BLACK);
-  tft.drawNumber(1, 20 + 0*spacing, y);
+  tft.drawNumber(1, 20 + 0 * spacing, y);
 
-  tft.fillCircle(20 + 1*spacing, y, r, Line_Sensor_2 ? active : inactive);
-  tft.drawCircle(20+ 1*spacing, y, r, TFT_BLACK);
+  tft.fillCircle(20 + 1 * spacing, y, r, Line_Sensor_2 ? active : inactive);
+  tft.drawCircle(20 + 1 * spacing, y, r, TFT_BLACK);
   tft.setTextColor(Line_Sensor_2 ? TFT_WHITE : TFT_BLACK);
-  tft.drawNumber(2, 20 + 1*spacing, y);
+  tft.drawNumber(2, 20 + 1 * spacing, y);
 
-  tft.fillCircle(20 + 2*spacing, y, r, Line_Sensor_3 ? active : inactive);
-  tft.drawCircle(20+ 2*spacing, y, r, TFT_BLACK);
+  tft.fillCircle(20 + 2 * spacing, y, r, Line_Sensor_3 ? active : inactive);
+  tft.drawCircle(20 + 2 * spacing, y, r, TFT_BLACK);
   tft.setTextColor(Line_Sensor_3 ? TFT_WHITE : TFT_BLACK);
-  tft.drawNumber(3, 20 + 2*spacing, y);
+  tft.drawNumber(3, 20 + 2 * spacing, y);
 
-  tft.fillCircle(20 + 3*spacing, y, r, Line_Sensor_4 ? active : inactive);
-  tft.drawCircle(20+ 3*spacing, y, r, TFT_BLACK);
+  tft.fillCircle(20 + 3 * spacing, y, r, Line_Sensor_4 ? active : inactive);
+  tft.drawCircle(20 + 3 * spacing, y, r, TFT_BLACK);
   tft.setTextColor(Line_Sensor_4 ? TFT_WHITE : TFT_BLACK);
-  tft.drawNumber(4, 20 + 3*spacing, y);
+  tft.drawNumber(4, 20 + 3 * spacing, y);
 
-  tft.fillCircle(20 + 4*spacing, y, r, Line_Sensor_5 ? active : inactive);
-  tft.drawCircle(20+ 4*spacing, y, r, TFT_BLACK);
+  tft.fillCircle(20 + 4 * spacing, y, r, Line_Sensor_5 ? active : inactive);
+  tft.drawCircle(20 + 4 * spacing, y, r, TFT_BLACK);
   tft.setTextColor(Line_Sensor_5 ? TFT_WHITE : TFT_BLACK);
-  tft.drawNumber(5, 20 + 4*spacing, y);
+  tft.drawNumber(5, 20 + 4 * spacing, y);
 
   tft.setCursor(10, y + 20);
-  
+  tft.print("Line Sensors");
 
   int maxDist = 100;
   int barX = 20;
@@ -410,26 +371,5 @@ void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Se
 
   tft.fillRoundRect(100, 120, boxW, boxH, 5, (modeB) ? TFT_GREEN : TFT_DARKGREY);
   tft.setCursor(110, 130);
-  tft.setTextColor(TFT_BLACK);
   tft.printf("B:%i", modeB);
-
-  // Display current mode
-  tft.setTextDatum(TL_DATUM);
-  tft.setTextFont(4);
-  tft.setTextSize(1);
-  tft.setTextColor(TFT_BLACK, TFT_WHITE);
-  // Clear previous mode text to avoid overlap
-  tft.fillRect(10, 160, 200, 20, TFT_WHITE);
-  const char* modeStr;
-  switch (mode) {
-    case IDLE_MODE: modeStr = "IDLE"; break;
-    case ATTACK_MODE: modeStr = "ATTACK"; break;
-    case DEFENCE_MODE: modeStr = "DEFENCE"; break;
-    case SEARCH_MODE: modeStr = "SEARCH"; break;
-    case BLIND_MODE: modeStr = "BLIND"; break;
-    default: modeStr = "UNKNOWN"; break;
-  }
-  tft.setCursor(160, 100);
-  tft.print("Mode: ");
-  tft.print(modeStr);
 }
