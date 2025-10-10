@@ -5,17 +5,18 @@
 #define RIGHT_BUTTON 14
 
 //----------------DEFINING_LINE_SENSORS--------------------
-#define SENSOR_LINE_1_PIN 1
-#define SENSOR_LINE_2_PIN 2
-#define SENSOR_LINE_3_PIN 3
-#define SENSOR_LINE_4_PIN 10
-#define SENSOR_LINE_5_PIN 11
+#define SENSOR_LINE_1_PIN 1  // Front
+#define SENSOR_LINE_2_PIN 2  // Right
+#define SENSOR_LINE_3_PIN 3  // Back right
+#define SENSOR_LINE_4_PIN 10 // Back left
+#define SENSOR_LINE_5_PIN 11 // Left
 //---------------------------------------------------------
 
 //-----------------DEFINING_ULTRASONIC_SENSORS--------------
-#define SONIC_OUT_PIN 12 //18
-#define SONIC_IN_PIN1 43 //44
-#define SONIC_REFRESH_RATE 12000 // max distance of about 2 meters
+#define SONIC_OUT_PIN 12
+#define SONIC_IN_PIN1 43
+#define SONIC_REFRESH_RATE 12000 // max distance ~2m
+#define ARENA_DIAMETER 50 // Test arena diameter in cm
 //----------------------------------------------------------
 
 //-----------DEFINING_MOTORS (TB6612FNG)-------------------
@@ -35,7 +36,6 @@ TFT_eSPI tft = TFT_eSPI();
 //----------VARIABLES_FOR_ULTRASONIC_SENSORS----------------
 bool USready = true;
 int StartTime1;
-int EchoTime1;
 float dist1;
 unsigned long lastTrigger = 0;
 //----------------------------------------------------------
@@ -73,21 +73,17 @@ void IRAM_ATTR ChangeSensor5() {
 //---------------VARIABLES_FOR_MOTORS-------------------------
 int AMotorDuty = 0;
 int BMotorDuty = 0;
-
 int AMotorDutyCurrent = 0;
 int BMotorDutyCurrent = 0;
-
 int ADirection = 0;
 int BDirection = 0;
 //------------------------------------------------------------
 
 //-------------------------DEFINING_FUNCTIONS-----------------
-void IRAM_ATTR SonicSensorTrigger();
-void SonicDistance1();
-void SonicDistance2();
+void IRAM_ATTR SonicDistance1();
+void USTrigger();
 void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Sensor_4, int Line_Sensor_5,
             int dist1, int modeA, int modeB);
-void USTrigger();
 
 void setMotor(int motor, int direction, int duty) {
   if (motor == 0) { // A
@@ -119,8 +115,8 @@ void setup() {
 
   Serial.begin(115200);
 
-  pinMode(LEFT_BUTTON,INPUT_PULLUP);
-  pinMode(RIGHT_BUTTON,INPUT_PULLUP);
+  pinMode(LEFT_BUTTON, INPUT_PULLUP);
+  pinMode(RIGHT_BUTTON, INPUT_PULLUP);
 
   tft.init();
   tft.setRotation(1);
@@ -128,36 +124,34 @@ void setup() {
 
   //---------------SETUP_FOR_LINE_SENSORS-------------------------
   Line_Sensor_1 = digitalRead(SENSOR_LINE_1_PIN);
-  attachInterrupt(SENSOR_LINE_1_PIN,ChangeSensor1,CHANGE);
+  attachInterrupt(SENSOR_LINE_1_PIN, ChangeSensor1, CHANGE);
   Line_Sensor_2 = digitalRead(SENSOR_LINE_2_PIN);
-  attachInterrupt(SENSOR_LINE_2_PIN,ChangeSensor2,CHANGE);
+  attachInterrupt(SENSOR_LINE_2_PIN, ChangeSensor2, CHANGE);
   Line_Sensor_3 = digitalRead(SENSOR_LINE_3_PIN);
-  attachInterrupt(SENSOR_LINE_3_PIN,ChangeSensor3,CHANGE);
+  attachInterrupt(SENSOR_LINE_3_PIN, ChangeSensor3, CHANGE);
   Line_Sensor_4 = digitalRead(SENSOR_LINE_4_PIN);
-  attachInterrupt(SENSOR_LINE_4_PIN,ChangeSensor4,CHANGE);
+  attachInterrupt(SENSOR_LINE_4_PIN, ChangeSensor4, CHANGE);
   Line_Sensor_5 = digitalRead(SENSOR_LINE_5_PIN);
-  attachInterrupt(SENSOR_LINE_5_PIN,ChangeSensor5,CHANGE);
+  attachInterrupt(SENSOR_LINE_5_PIN, ChangeSensor5, CHANGE);
   //-------------------------------------------------------------
 
   //--------------SETUP_FOR_ULTRASONIC_SENSORS------------------------
-  pinMode(SONIC_OUT_PIN,OUTPUT);
-  pinMode(SONIC_IN_PIN1,INPUT_PULLUP);
-  attachInterrupt(SONIC_IN_PIN1,SonicDistance1,CHANGE);
+  pinMode(SONIC_OUT_PIN, OUTPUT);
+  pinMode(SONIC_IN_PIN1, INPUT_PULLUP);
+  attachInterrupt(SONIC_IN_PIN1, SonicDistance1, CHANGE);
   //-------------------------------------------------------------
 
   //-------------------SETUP_FOR_MOTORS (TB6612FNG)-------------------
-  pinMode(AIN1,OUTPUT);
-  pinMode(AIN2,OUTPUT);
-  pinMode(PWMA,OUTPUT);
+  pinMode(AIN1, OUTPUT);
+  pinMode(AIN2, OUTPUT);
+  pinMode(PWMA, OUTPUT);
+  pinMode(BIN1, OUTPUT);
+  pinMode(BIN2, OUTPUT);
+  pinMode(PWMB, OUTPUT);
 
-  pinMode(BIN1,OUTPUT);
-  pinMode(BIN2,OUTPUT);
-  pinMode(PWMB,OUTPUT);
-
-  ledcSetup(A_LEDC_CHANNEL,20000,8);
+  ledcSetup(A_LEDC_CHANNEL, 5000, 8); // Lowered to 5kHz for motor reliability
   ledcAttachPin(PWMA, A_LEDC_CHANNEL);
-
-  ledcSetup(B_LEDC_CHANNEL,20000,8);
+  ledcSetup(B_LEDC_CHANNEL, 5000, 8);
   ledcAttachPin(PWMB, B_LEDC_CHANNEL);
   //-------------------------------------------------------------
 }
@@ -165,120 +159,132 @@ void setup() {
 //-----------------------variables for combat logic------------------------------------
 #define LINE_SENSOR_WHITE 0
 #define LINE_SENSOR_BLACK 1
-#define ATTACK_MODE 0
-#define DEFENCE_MODE 1
-#define SEARCH_MODE 2
-#define BLIND_MODE 3
+#define IDLE_MODE 0
+#define ATTACK_MODE 1
+#define DEFENCE_MODE 2
+#define SEARCH_MODE 3
+#define BLIND_MODE 4
 #define MOTOR_FORWARDS 0
 #define MOTOR_BACKWARDS 1
 
-int mode = 0;
+int mode = IDLE_MODE; // Start in IDLE_MODE
 int timeofaction;
 bool crisisaverted = true;
 //-------------------------------------------------------------------------------------
 
 void loop() {
-  if (USready || (micros()-lastTrigger > 50000)) {
+  // Trigger ultrasonic sensor
+  if (USready || (micros() - lastTrigger > 50000)) {
     USready = false;
     lastTrigger = micros();
     USTrigger();
   }
 
+  // Print distance for debugging
   Serial.print("Ultrasonic distance: ");
   Serial.print(dist1);
-  Serial.println(" cm");
+  Serial.print(" cm, Mode: ");
+  Serial.println(mode);
 
+  // Update GUI
   drawUI(Line_Sensor_1, Line_Sensor_2, Line_Sensor_3, Line_Sensor_4, Line_Sensor_5,
-       dist1, AMotorDuty, BMotorDuty);
-  
-  if(AMotorDutyCurrent != AMotorDuty || BMotorDutyCurrent != BMotorDuty) {
+         dist1, AMotorDuty, BMotorDuty);
+
+  // Update motors if duty changed
+  if (AMotorDutyCurrent != AMotorDuty || BMotorDutyCurrent != BMotorDuty) {
     AMotorDutyCurrent = AMotorDuty;
     BMotorDutyCurrent = BMotorDuty;
     setMotor(0, ADirection, AMotorDuty);
     setMotor(1, BDirection, BMotorDuty);
   }
 
+  // Check for button press to exit IDLE_MODE
+  if (mode == IDLE_MODE) {
+    AMotorDuty = 0;
+    BMotorDuty = 0; // Motors off
+    if (digitalRead(LEFT_BUTTON) == LOW) { // Button pressed (INPUT_PULLUP, so LOW = pressed)
+      mode = SEARCH_MODE; // Start in SEARCH_MODE
+    }
+    return; // Skip other logic in IDLE_MODE
+  }
+
+  // Normal operation logic
   int dangerlevel = Line_Sensor_1 + Line_Sensor_2 + Line_Sensor_3 + Line_Sensor_4 + Line_Sensor_5;
 
-  if(Line_Sensor_1 == LINE_SENSOR_WHITE && Line_Sensor_2 == LINE_SENSOR_WHITE && 
-      Line_Sensor_3 == LINE_SENSOR_WHITE && Line_Sensor_4 == LINE_SENSOR_WHITE && Line_Sensor_5 == LINE_SENSOR_WHITE) {
+  // Mode logic
+  if (dangerlevel == 0) { // All sensors white, safe
     mode = ATTACK_MODE;
     crisisaverted = false;
-  }
-  if(Line_Sensor_1 == LINE_SENSOR_WHITE || Line_Sensor_2 == LINE_SENSOR_WHITE || 
-      Line_Sensor_3 == LINE_SENSOR_WHITE || Line_Sensor_4 == LINE_SENSOR_WHITE || Line_Sensor_5 == LINE_SENSOR_WHITE) {
+  } else if (dangerlevel > 0) { // Any sensor black, edge detected
     mode = DEFENCE_MODE;
   }
-  if(dist1 >= 150) {
+  if (dist1 >= 60) { // Opponent far, scaled for small arena
     mode = SEARCH_MODE;
   }
-
-  if(mode == ATTACK_MODE) {
-    if(dist1 < 100) {
-      ADirection = MOTOR_FORWARDS;
-      BDirection = MOTOR_FORWARDS;
-      AMotorDuty = 200;
-      BMotorDuty = 200;
-    }
+  if (mode == SEARCH_MODE && dangerlevel == 0 && dist1 <= 30) {
+    mode = ATTACK_MODE;
   }
 
-  else if(mode == DEFENCE_MODE) {
-    if(2000 >= millis() - timeofaction && crisisaverted == true) {
-      crisisaverted = false;
-    }
-    if(crisisaverted = false && (Line_Sensor_3 == LINE_SENSOR_BLACK && Line_Sensor_4 == LINE_SENSOR_BLACK)) {
-      ADirection = MOTOR_BACKWARDS;
-      BDirection = MOTOR_BACKWARDS;
-      AMotorDuty = 255;
-      BMotorDuty = 20;
-      timeofaction = millis();
-      crisisaverted = true;
-    }
-    if(Line_Sensor_2 == LINE_SENSOR_BLACK) {
-      ADirection = MOTOR_FORWARDS;
-      BDirection = MOTOR_FORWARDS;
-      BMotorDuty = 200;
-      AMotorDuty = 100;
-      timeofaction = millis();
-      crisisaverted = true;
-    }
-    if(Line_Sensor_5 == LINE_SENSOR_BLACK) {
-      ADirection = MOTOR_FORWARDS;
-      BDirection = MOTOR_FORWARDS;
-      BMotorDuty = 100;
-      AMotorDuty = 200;
-      timeofaction = millis();
-      crisisaverted = true;
-    }
-    if(Line_Sensor_3 == LINE_SENSOR_BLACK || Line_Sensor_4 == LINE_SENSOR_BLACK) {
+  if (mode == ATTACK_MODE) {
+    if (dist1 < 40) {
       ADirection = MOTOR_FORWARDS;
       BDirection = MOTOR_FORWARDS;
       AMotorDuty = 200;
       BMotorDuty = 200;
-      timeofaction = millis();
-      crisisaverted = true;
     }
-    if(Line_Sensor_1 == LINE_SENSOR_BLACK) {
-      ADirection = MOTOR_BACKWARDS;
-      BDirection = MOTOR_BACKWARDS;
-      AMotorDuty = 200 - Line_Sensor_2*100;
-      BMotorDuty = 200 - Line_Sensor_5*100;
-      timeofaction = millis();
-      crisisaverted = true;
+  } else if (mode == DEFENCE_MODE) {
+    if (millis() - timeofaction >= 2000 && crisisaverted == true) {
+      crisisaverted = false; // Allow new action after 2s cooldown
     }
-  }
-  else if(mode == SEARCH_MODE) {
+    if (!crisisaverted) { // Fixed comparison
+      if (Line_Sensor_3 == LINE_SENSOR_BLACK && Line_Sensor_4 == LINE_SENSOR_BLACK) {
+        ADirection = MOTOR_BACKWARDS;
+        BDirection = MOTOR_BACKWARDS;
+        AMotorDuty = 255;
+        BMotorDuty = 20; // Pivot turn
+        timeofaction = millis();
+        crisisaverted = true;
+      } else if (Line_Sensor_2 == LINE_SENSOR_BLACK) {
+        ADirection = MOTOR_FORWARDS;
+        BDirection = MOTOR_FORWARDS;
+        BMotorDuty = 200;
+        AMotorDuty = 100; // Turn left
+        timeofaction = millis();
+        crisisaverted = true;
+      } else if (Line_Sensor_5 == LINE_SENSOR_BLACK) {
+        ADirection = MOTOR_FORWARDS;
+        BDirection = MOTOR_FORWARDS;
+        BMotorDuty = 100;
+        AMotorDuty = 200; // Turn right
+        timeofaction = millis();
+        crisisaverted = true;
+      } else if (Line_Sensor_3 == LINE_SENSOR_BLACK || Line_Sensor_4 == LINE_SENSOR_BLACK) {
+        ADirection = MOTOR_FORWARDS;
+        BDirection = MOTOR_FORWARDS;
+        AMotorDuty = 200;
+        BMotorDuty = 200; // Push forward
+        timeofaction = millis();
+        crisisaverted = true;
+      } else if (Line_Sensor_1 == LINE_SENSOR_BLACK) {
+        ADirection = MOTOR_BACKWARDS;
+        BDirection = MOTOR_BACKWARDS;
+        AMotorDuty = 200 - Line_Sensor_2 * 100;
+        BMotorDuty = 200 - Line_Sensor_5 * 100; // Variable back turn
+        timeofaction = millis();
+        crisisaverted = true;
+      }
+    }
+  } else if (mode == SEARCH_MODE) {
     ADirection = MOTOR_BACKWARDS;
     BDirection = MOTOR_FORWARDS;
-    AMotorDuty = 50;
-    BMotorDuty = 50;
-    if(dangerlevel == 0 && dist1 <= 75) {
-      mode = ATTACK_MODE;
-    }
+    AMotorDuty = 80; // Increased for motor reliability
+    BMotorDuty = 80;
   }
-  else if(mode == BLIND_MODE) {
+  // BLIND_MODE remains empty
 
-  }
+  // Enforce minimum duty for motor reliability
+  if (AMotorDuty > 0 && AMotorDuty < 80) AMotorDuty = 80;
+  if (BMotorDuty > 0 && BMotorDuty < 80) BMotorDuty = 80;
 }
 
 void USTrigger() {
@@ -290,19 +296,20 @@ void USTrigger() {
 }
 
 void IRAM_ATTR SonicDistance1() {
-  if(digitalRead(SONIC_IN_PIN1) == HIGH) {
+  if (digitalRead(SONIC_IN_PIN1) == HIGH) {
     StartTime1 = micros();
   } else {
     int EchoTime1 = micros() - StartTime1;
-    dist1 = (EchoTime1 * 0.0343)/2;
+    dist1 = (EchoTime1 * 0.0343) / 2;
+    if (dist1 > ARENA_DIAMETER) {
+      dist1 = 60; // Cap to trigger SEARCH_MODE for small arena
+    }
     USready = true;
   }
 }
 
-//beautiful GUI helper. 
 void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Sensor_4, int Line_Sensor_5,
             int dist1, int modeA, int modeB) {
-  
   tft.setTextDatum(TL_DATUM);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
 
@@ -310,34 +317,34 @@ void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Se
   int spacing = 60;
   int r = 12;
   uint16_t active = TFT_BLACK, inactive = TFT_WHITE;
-  
+
   tft.setTextDatum(MC_DATUM);
-   
-  tft.fillCircle(20 + 0*spacing, y, r, Line_Sensor_1 ? active : inactive);
-  tft.drawCircle(20+ 0*spacing, y,r,TFT_BLACK);
+
+  tft.fillCircle(20 + 0 * spacing, y, r, Line_Sensor_1 ? active : inactive);
+  tft.drawCircle(20 + 0 * spacing, y, r, TFT_BLACK);
   tft.setTextColor(Line_Sensor_1 ? TFT_WHITE : TFT_BLACK);
-  tft.drawNumber(1, 20 + 0*spacing, y);
+  tft.drawNumber(1, 20 + 0 * spacing, y);
 
-  tft.fillCircle(20 + 1*spacing, y, r, Line_Sensor_2 ? active : inactive);
-  tft.drawCircle(20+ 1*spacing, y,r,TFT_BLACK);
+  tft.fillCircle(20 + 1 * spacing, y, r, Line_Sensor_2 ? active : inactive);
+  tft.drawCircle(20 + 1 * spacing, y, r, TFT_BLACK);
   tft.setTextColor(Line_Sensor_2 ? TFT_WHITE : TFT_BLACK);
-  tft.drawNumber(2, 20 + 1*spacing, y);
+  tft.drawNumber(2, 20 + 1 * spacing, y);
 
-  tft.fillCircle(20 + 2*spacing, y, r, Line_Sensor_3 ? active : inactive);
-  tft.drawCircle(20+ 2*spacing, y,r,TFT_BLACK);
+  tft.fillCircle(20 + 2 * spacing, y, r, Line_Sensor_3 ? active : inactive);
+  tft.drawCircle(20 + 2 * spacing, y, r, TFT_BLACK);
   tft.setTextColor(Line_Sensor_3 ? TFT_WHITE : TFT_BLACK);
-  tft.drawNumber(3, 20 + 2*spacing, y);
+  tft.drawNumber(3, 20 + 2 * spacing, y);
 
-  tft.fillCircle(20 + 3*spacing, y, r, Line_Sensor_4 ? active : inactive);
-  tft.drawCircle(20+ 3*spacing, y,r,TFT_BLACK);
+  tft.fillCircle(20 + 3 * spacing, y, r, Line_Sensor_4 ? active : inactive);
+  tft.drawCircle(20 + 3 * spacing, y, r, TFT_BLACK);
   tft.setTextColor(Line_Sensor_4 ? TFT_WHITE : TFT_BLACK);
-  tft.drawNumber(4, 20 + 3*spacing, y);
+  tft.drawNumber(4, 20 + 3 * spacing, y);
 
-  tft.fillCircle(20 + 4*spacing, y, r, Line_Sensor_5 ? active : inactive);
-  tft.drawCircle(20+ 4*spacing, y,r,TFT_BLACK);
+  tft.fillCircle(20 + 4 * spacing, y, r, Line_Sensor_5 ? active : inactive);
+  tft.drawCircle(20 + 4 * spacing, y, r, TFT_BLACK);
   tft.setTextColor(Line_Sensor_5 ? TFT_WHITE : TFT_BLACK);
-  tft.drawNumber(5, 20 + 4*spacing, y);
-  
+  tft.drawNumber(5, 20 + 4 * spacing, y);
+
   tft.setCursor(10, y + 20);
   tft.print("Line Sensors");
 
@@ -364,7 +371,7 @@ void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Se
   tft.drawString(buf, barX + barW / 2, barY + barH / 2);
 
   int boxW = 60, boxH = 30;
-  
+
   tft.fillRoundRect(20, 120, boxW, boxH, 5, (modeA) ? TFT_GREEN : TFT_DARKGREY);
   tft.setCursor(30, 130);
   tft.setTextColor(TFT_BLACK);
