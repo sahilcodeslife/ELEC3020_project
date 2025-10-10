@@ -159,7 +159,7 @@ void setup() {
 
   ledcSetup(A_LEDC_CHANNEL, 5000, 8); // Lowered to 5kHz for motor reliability
   ledcAttachPin(PWMA, A_LEDC_CHANNEL);
-  ledcSetup(B_LEDC_CHANNEL, 5000, 8);
+  ledcSetup(B_LEDC_CHANNEL, 20000, 8);
   ledcAttachPin(PWMB, B_LEDC_CHANNEL);
   //-------------------------------------------------------------
 }
