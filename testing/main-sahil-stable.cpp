@@ -72,7 +72,7 @@ void IRAM_ATTR ChangeSensor5() {
 
 //---------------VARIABLES_FOR_MOTORS-------------------------
 int AMotorDuty = 0;
-int BMotorDuty = 0;
+int BMotorDuty = 0; // UNDERPOWERED add 20 to offset
 int AMotorDutyCurrent = 0;
 int BMotorDutyCurrent = 0;
 int ADirection = 0;
@@ -167,7 +167,7 @@ void setup() {
 #define MOTOR_FORWARDS 0
 #define MOTOR_BACKWARDS 1
 #define ATTACK_THRESHOLD 25 // Lowered from 40 to require better alignment (centering)
-#define ATTACK_CHECK_INTERVAL 1500 // Check distance every 500ms in ATTACK_MODE
+#define ATTACK_CHECK_INTERVAL 2000
 
 int mode = IDLE_MODE; // Start in IDLE_MODE
 int timeofaction;
@@ -234,8 +234,8 @@ void loop() {
     } else if (dist1 < ATTACK_THRESHOLD) {
       ADirection = MOTOR_FORWARDS;
       BDirection = MOTOR_FORWARDS;
-      AMotorDuty = 200;
-      BMotorDuty = 200;
+      AMotorDuty = 200; 
+      BMotorDuty = 220;
     }
   } else if (mode == DEFENCE_MODE) {
     if (millis() - timeofaction >= 1000 && crisisaverted == true) {
