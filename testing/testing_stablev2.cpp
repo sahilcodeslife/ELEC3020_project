@@ -262,8 +262,8 @@ void loop() {
     if (dist1 < ATTACK_THRESHOLD) {
       ADirection = MOTOR_FORWARDS;
       BDirection = MOTOR_FORWARDS;
-      AMotorDuty = 200; 
-      BMotorDuty = 220;
+      AMotorDuty = 230; 
+      BMotorDuty = 250;
     }
   } else if (mode == DEFENCE_MODE) {
     if (millis() - timeofaction >= 1000 && crisisaverted == true) {
@@ -339,8 +339,8 @@ void loop() {
   } else if (mode == SEARCH_MODE) {
     ADirection = MOTOR_BACKWARDS;
     BDirection = MOTOR_FORWARDS;
-    AMotorDuty = 170;
-    BMotorDuty = 170;
+    AMotorDuty = 200;
+    BMotorDuty = 200;
   } else if (mode == ATTACK_SEARCH_SUBMODE) {
     // Oscillating scan: small left/right turns with pauses
     unsigned long currentTime = millis();
@@ -355,8 +355,8 @@ void loop() {
       scanCycleCount = 0;
     } else {
       // Handle the turn/pause cycle
-      // int phase = (currentTime - scanStartTime) / (SCAN_TURN_DURATION + SCAN_PAUSE_DURATION);
-      // if (phase % 2 == 0) {  // Turn phase
+       int phase = (currentTime - scanStartTime) / (SCAN_TURN_DURATION + SCAN_PAUSE_DURATION);
+      if (phase % 2 == 0) {  // Turn phase
         if (scanDirection == 0) {  // Left turn: left motor back, right forward
           ADirection = MOTOR_BACKWARDS;
           BDirection = MOTOR_FORWARDS;
@@ -364,9 +364,9 @@ void loop() {
           ADirection = MOTOR_FORWARDS;
           BDirection = MOTOR_BACKWARDS;
         }
-        AMotorDuty = 170;
-        BMotorDuty = 170;
-      // }
+        AMotorDuty = 200;
+        BMotorDuty = 200;
+      }
       
       // Advance to next direction after full turn+pause
       if (currentTime - scanStartTime >= SCAN_TURN_DURATION + SCAN_PAUSE_DURATION) {
