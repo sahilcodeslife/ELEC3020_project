@@ -25,7 +25,7 @@
 #define PWMA 44
 #define A_LEDC_CHANNEL 0
 
-#define BIN1 21
+#define BIN1 21 // SHIT MOTOR ALWAYS OVERPOWER. 
 #define BIN2 16
 #define PWMB 13
 #define B_LEDC_CHANNEL 1
@@ -35,7 +35,7 @@ TFT_eSPI tft = TFT_eSPI();
 
 //----------VARIABLES_FOR_ULTRASONIC_SENSORS----------------
 bool USready = true;
-int StartTime1;
+unsigned long StartTime1;
 float dist1;
 unsigned long lastTrigger = 0;
 //----------------------------------------------------------
@@ -110,7 +110,6 @@ void setMotor(int motor, int direction, int duty) {
 //------------------------------------------------------------
 
 void setup() {
-    //backlight on ttgo
   pinMode(15, OUTPUT);
   digitalWrite(15, HIGH);
 
@@ -123,7 +122,6 @@ void setup() {
   tft.setRotation(1);
   tft.fillScreen(TFT_WHITE);
 
-  //---------------SETUP_FOR_LINE_SENSORS-------------------------
   Line_Sensor_1 = digitalRead(SENSOR_LINE_1_PIN);
   attachInterrupt(SENSOR_LINE_1_PIN, ChangeSensor1, CHANGE);
   Line_Sensor_2 = digitalRead(SENSOR_LINE_2_PIN);
@@ -134,15 +132,11 @@ void setup() {
   attachInterrupt(SENSOR_LINE_4_PIN, ChangeSensor4, CHANGE);
   Line_Sensor_5 = digitalRead(SENSOR_LINE_5_PIN);
   attachInterrupt(SENSOR_LINE_5_PIN, ChangeSensor5, CHANGE);
-  //-------------------------------------------------------------
 
-  //--------------SETUP_FOR_ULTRASONIC_SENSORS------------------------
   pinMode(SONIC_OUT_PIN, OUTPUT);
   pinMode(SONIC_IN_PIN1, INPUT_PULLUP);
   attachInterrupt(SONIC_IN_PIN1, SonicDistance1, CHANGE);
-  //-------------------------------------------------------------
 
-  //-------------------SETUP_FOR_MOTORS (TB6612FNG)-------------------
   pinMode(AIN1, OUTPUT);
   pinMode(AIN2, OUTPUT);
   pinMode(PWMA, OUTPUT);
@@ -150,11 +144,10 @@ void setup() {
   pinMode(BIN2, OUTPUT);
   pinMode(PWMB, OUTPUT);
 
-  ledcSetup(A_LEDC_CHANNEL, 5000, 8); // Lowered to 5kHz for motor reliability
+  ledcSetup(A_LEDC_CHANNEL, 5000, 8);
   ledcAttachPin(PWMA, A_LEDC_CHANNEL);
   ledcSetup(B_LEDC_CHANNEL, 5000, 8);
   ledcAttachPin(PWMB, B_LEDC_CHANNEL);
-  //-------------------------------------------------------------
 }
 
 //-----------------------variables for combat logic------------------------------------
@@ -165,39 +158,68 @@ void setup() {
 #define DEFENCE_MODE 2
 #define SEARCH_MODE 3
 #define BLIND_MODE 4
-#define FULL_SPIN_MODE 6  // Mode for 360-degree spin after sway search fails
 #define MOTOR_FORWARDS 0
 #define MOTOR_BACKWARDS 1
 
-#define ATTACK_THRESHOLD 60 // Lowered from 40 to require better alignment (centering)
-#define ATTACK_CHECK_INTERVAL 2000
-#define SCAN_TURN_DURATION 450  // ms for each small turn (tune for ~15-20 degree sweep)
-#define SCAN_PAUSE_DURATION 100  // ms pause to allow US sensor to update
-#define MAX_SWAY_CYCLES 1  // Number of left/right oscillations in SEARCH_MODE before switching to FULL_SPIN_MODE
-#define SPIN_DURATION 600  // ms for 180-degree turn in DEFENCE_MODE (tune based on bot)
-#define ESCAPE_DURATION 500  // ms for forward burst after spin
+#define ATTACK_THRESHOLD 55 // Distance to trigger ATTACK_MODE (cm)
+#define SEARCH_TURN_DURATION 400 // ms for each turn (~15-20 degree sweep)
+#define SEARCH_PAUSE_DURATION 100 // ms pause to allow US sensor to update
+#define SEARCH_BRAKE_DURATION 50 // ms for brief braking before pause
+#define SEARCH_FULL_SPIN_DURATION 900 // ms for full 360-degree spin
+#define SPIN_DURATION 450 // ms for 180-degree turn in DEFENCE_MODE
+#define ESCAPE_DURATION 800
+#define ADJUST_DURATION 400 // ms for brief slight turn adjustment
+#define ALIGN_TURN_DURATION 100 // ms for brief left/right turn (~5-10 degrees)
+#define ALIGN_PAUSE_DURATION 100 // ms pause to measure distance
+#define FINAL_TURN_DURATION 300 // ms for on-spot turn toward opponent (~30-45 degrees)
 
-int mode = IDLE_MODE; // Start in IDLE_MODE
-unsigned long lastAttackCheck = 0; // Timer for periodic distance checks in ATTACK_MODE
-unsigned long swayStartTime = 0;  // Timer for sway turns in SEARCH_MODE
-int swayDirection = 0;  // 0 = left, 1 = right for SEARCH_MODE
-int swayCycleCount = 0;  // Track oscillations in SEARCH_MODE
-unsigned long defenceStartTime = 0;  // Timer for non-blocking defense actions
-int defenceSubMode = 0;  // 0: idle, 1: spin, 2: escape forward
+#define ADJUST_LEFT 0
+#define ADJUST_RIGHT 1
+
+#define ATTACK_ALIGN_LEFT 1
+#define ATTACK_PAUSE_LEFT 2
+#define ATTACK_ALIGN_RIGHT 3
+#define ATTACK_PAUSE_RIGHT 4
+#define ATTACK_TURN_FINAL 5
+
+#define SEARCH_LEFT_TURN 0
+#define SEARCH_RIGHT_TURN 1
+#define SEARCH_PAUSE 2
+#define SEARCH_BRAKE 3
+#define SEARCH_FULL_SPIN 4
+
+
+int mode = IDLE_MODE;
+unsigned long lastAttackCheck = 0;
+unsigned long searchStateStartTime = 0;
+int searchState = SEARCH_PAUSE;
+int lastSearchTurnState = SEARCH_RIGHT_TURN;
+bool swayCycleComplete = false;
+unsigned long defenceStartTime = 0;
+int defenceSubMode = 0;
+
+unsigned long attackStartTime = 0;
+int lastTurnDirection = 0;
+int attackSubState = 0;
+unsigned long attackSubStartTime = 0;
+float dist_left = MAX_DISTANCE;
+float dist_right = MAX_DISTANCE;
 //-------------------------------------------------------------------------------------
 
 void loop() {
-  // Trigger ultrasonic sensor
-  if (USready || (micros() - lastTrigger > 100000)) { // increased from 50,000 --> 100,000
+
+    if (digitalRead(RIGHT_BUTTON) == LOW){
+        ESP.restart();
+    }
+  if (USready || (micros() - lastTrigger > 100000)) {
     USready = false;
     lastTrigger = micros();
     USTrigger();
   }
-  // Update GUI
+
   drawUI(Line_Sensor_1, Line_Sensor_2, Line_Sensor_3, Line_Sensor_4, Line_Sensor_5,
          dist1, AMotorDuty, BMotorDuty, mode);
 
-  // Update motors if duty changed
   if (AMotorDutyCurrent != AMotorDuty || BMotorDutyCurrent != BMotorDuty) {
     AMotorDutyCurrent = AMotorDuty;
     BMotorDutyCurrent = BMotorDuty;
@@ -205,145 +227,273 @@ void loop() {
     setMotor(1, BDirection, BMotorDuty);
   }
 
-  // Check for button press to exit IDLE_MODE
   if (mode == IDLE_MODE) {
     AMotorDuty = 0;
-    BMotorDuty = 0; // Motors off
-    if (digitalRead(LEFT_BUTTON) == LOW) { // Button pressed (INPUT_PULLUP, so LOW = pressed)
-      mode = SEARCH_MODE; // Start in SEARCH_MODE
-      swayStartTime = millis(); // Initialize sway timer
-      swayDirection = 0; // Start with left turn
-      swayCycleCount = 0; // Reset sway counter
+    BMotorDuty = 0;
+    if (digitalRead(LEFT_BUTTON) == LOW) {
+      mode = SEARCH_MODE;
+      searchStateStartTime = millis();
+      searchState = SEARCH_PAUSE;
+      lastSearchTurnState = SEARCH_RIGHT_TURN;
+      swayCycleComplete = false;
+      AMotorDuty = 0;
+      BMotorDuty = 0;
     }
-    return; // Skip other logic in IDLE_MODE
+    return;
   }
 
-  // Normal operation logic
-  int previous_mode = mode;  // Track for transition
+  int previous_mode = mode;
   int dangerlevel = Line_Sensor_1 + Line_Sensor_2 + Line_Sensor_3 + Line_Sensor_4 + Line_Sensor_5;
 
-  // Mode logic with DEFENCE_MODE as highest priority
-  if (dangerlevel > 0) { // Any sensor black, edge detected
+  if (dangerlevel > 0 || defenceSubMode != 0 || (previous_mode == DEFENCE_MODE 
+      && millis() - defenceStartTime < (200 + SPIN_DURATION + ESCAPE_DURATION))) {
     mode = DEFENCE_MODE;
-  } else if (dist1 >= 60) { // Opponent far, use 60 cm threshold
-    mode = SEARCH_MODE;
-    swayStartTime = millis(); // Reset sway timer on transition
-    swayDirection = 0;
-    swayCycleCount = 0;
-  } else if (dist1 <= ATTACK_THRESHOLD) { // Only enter ATTACK_MODE if no black lines and opponent close
+  } else if (dist1 >= 60) {
+    if (mode != SEARCH_MODE) {
+      mode = SEARCH_MODE;
+      searchStateStartTime = millis();
+      searchState = SEARCH_PAUSE;
+      lastSearchTurnState = SEARCH_RIGHT_TURN;
+      swayCycleComplete = false;
+      AMotorDuty = 0;
+      BMotorDuty = 0;
+    }
+  } else if (dist1 < ATTACK_THRESHOLD) {
+    if (mode != ATTACK_MODE) {
+      lastAttackCheck = millis();
+      attackStartTime = millis();
+      if (mode == SEARCH_MODE) {
+        if (searchState == SEARCH_LEFT_TURN) {
+          lastTurnDirection = ADJUST_LEFT;
+        } else if (searchState == SEARCH_RIGHT_TURN) {
+          lastTurnDirection = ADJUST_RIGHT;
+        } else {
+          lastTurnDirection = (lastSearchTurnState == SEARCH_LEFT_TURN) ? ADJUST_LEFT : ADJUST_RIGHT;
+        }
+      } else {
+        lastTurnDirection = 0;
+      }
+      attackSubState = ATTACK_ALIGN_LEFT;
+      attackSubStartTime = millis();
+      dist_left = MAX_DISTANCE;
+      dist_right = MAX_DISTANCE;
+    }
     mode = ATTACK_MODE;
-    lastAttackCheck = millis();  // Reset timer when entering ATTACK_MODE
   } else {
-    mode = SEARCH_MODE; // Default to SEARCH_MODE if no black lines and opponent not close enough
+    if (mode != SEARCH_MODE) {
+      mode = SEARCH_MODE;
+      searchStateStartTime = millis();
+      searchState = SEARCH_PAUSE;
+      lastSearchTurnState = SEARCH_RIGHT_TURN;
+      swayCycleComplete = false;
+      AMotorDuty = 0;
+      BMotorDuty = 0;
+    }
   }
- 
-  // defining mode of attacks 
+
   if (mode == ATTACK_MODE) {
-    if (dist1 <= ATTACK_THRESHOLD) {
+    unsigned long currentTime = millis();
+    if (dist1 >= ATTACK_THRESHOLD) {
+      mode = SEARCH_MODE;
+      searchStateStartTime = currentTime;
+      searchState = SEARCH_PAUSE;
+      lastSearchTurnState = SEARCH_RIGHT_TURN;
+      swayCycleComplete = false;
+      AMotorDuty = 0;
+      BMotorDuty = 0;
+      attackSubState = 0;
+    } else if (attackSubState > 0) {
+      switch (attackSubState) {
+        case ATTACK_ALIGN_LEFT:
+          ADirection = MOTOR_BACKWARDS;
+          BDirection = MOTOR_FORWARDS;
+          AMotorDuty = 100;
+          BMotorDuty = 120;
+          if (currentTime - attackSubStartTime >= ALIGN_TURN_DURATION) {
+            attackSubState = ATTACK_PAUSE_LEFT;
+            attackSubStartTime = currentTime;
+            AMotorDuty = 0;
+            BMotorDuty = 0;
+          }
+          break;
+        case ATTACK_PAUSE_LEFT:
+          AMotorDuty = 0;
+          BMotorDuty = 0;
+          if (currentTime - attackSubStartTime >= ALIGN_PAUSE_DURATION) {
+            dist_left = dist1;
+            attackSubState = ATTACK_ALIGN_RIGHT;
+            attackSubStartTime = currentTime;
+          }
+          break;
+        case ATTACK_ALIGN_RIGHT:
+          ADirection = MOTOR_FORWARDS;
+          BDirection = MOTOR_BACKWARDS;
+          AMotorDuty = 100;
+          BMotorDuty = 120;
+          if (currentTime - attackSubStartTime >= 2 * ALIGN_TURN_DURATION) {
+            attackSubState = ATTACK_PAUSE_RIGHT;
+            attackSubStartTime = currentTime;
+            AMotorDuty = 0;
+            BMotorDuty = 0;
+          }
+          break;
+        case ATTACK_PAUSE_RIGHT:
+          AMotorDuty = 0;
+          BMotorDuty = 0;
+          if (currentTime - attackSubStartTime >= ALIGN_PAUSE_DURATION) {
+            dist_right = dist1;
+            attackSubState = ATTACK_TURN_FINAL;
+            attackSubStartTime = currentTime;
+            if (dist_left < dist_right) {
+              ADirection = MOTOR_BACKWARDS; // Turn left
+              BDirection = MOTOR_FORWARDS;
+            } else {
+              ADirection = MOTOR_FORWARDS; // Turn right
+              BDirection = MOTOR_BACKWARDS;
+            }
+            AMotorDuty = 150;
+            BMotorDuty = 180;
+          }
+          break;
+        case ATTACK_TURN_FINAL:
+          if (currentTime - attackSubStartTime >= FINAL_TURN_DURATION) {
+            attackSubState = 0;
+            attackStartTime = currentTime;
+            AMotorDuty = 0;
+            BMotorDuty = 0;
+          }
+          break;
+      }
+    } else {
       ADirection = MOTOR_FORWARDS;
       BDirection = MOTOR_FORWARDS;
-      AMotorDuty = 230; 
-      BMotorDuty = 255;
+      if (currentTime - attackStartTime < ADJUST_DURATION) {
+        if (lastTurnDirection == ADJUST_LEFT) {
+          AMotorDuty = 120;
+          BMotorDuty = 255;
+        } else if (lastTurnDirection == ADJUST_RIGHT) {
+          AMotorDuty = 220;
+          BMotorDuty = 140;
+        } else {
+          AMotorDuty = 230;
+          BMotorDuty = 255;
+        }
+      } else {
+        AMotorDuty = 230;
+        BMotorDuty = 255;
+      }
     }
   } else if (mode == DEFENCE_MODE) {
     unsigned long currentTime = millis();
-
-    // Prioritize front sensor: 180 spin then forward
-    if (Line_Sensor_1 == LINE_SENSOR_BLACK) {
-      if (defenceSubMode == 0) {  // Start action
-        defenceSubMode = 1;  // Spin phase
+    if (Line_Sensor_1 == LINE_SENSOR_BLACK || defenceSubMode != 0) {
+      if (defenceSubMode == 0) {
+        defenceSubMode = 3;
         defenceStartTime = currentTime;
-        ADirection = MOTOR_FORWARDS;  // Spin in place (left forward, right back)
+        ADirection = MOTOR_BACKWARDS;
         BDirection = MOTOR_BACKWARDS;
-        AMotorDuty = 200;
-        BMotorDuty = 230;
+        AMotorDuty = 150;
+        BMotorDuty = 150;
+      } else if (defenceSubMode == 3 && currentTime - defenceStartTime >= 200) {
+        defenceSubMode = 1;
+        defenceStartTime = currentTime;
+        ADirection = MOTOR_FORWARDS;
+        BDirection = MOTOR_BACKWARDS;
+        AMotorDuty = 255;
+        BMotorDuty = 255;
       } else if (defenceSubMode == 1 && currentTime - defenceStartTime >= SPIN_DURATION) {
-        defenceSubMode = 2;  // Escape forward phase
+        defenceSubMode = 2;
         defenceStartTime = currentTime;
         ADirection = MOTOR_FORWARDS;
         BDirection = MOTOR_FORWARDS;
         AMotorDuty = 255;
         BMotorDuty = 255;
       } else if (defenceSubMode == 2 && currentTime - defenceStartTime >= ESCAPE_DURATION) {
-        defenceSubMode = 0;  // Action complete, reset for next
+        defenceSubMode = 0;
+        AMotorDuty = 0;
+        BMotorDuty = 0;
       }
-    }
-    // Sides: Differential turns
-    else if (Line_Sensor_5 == LINE_SENSOR_BLACK) {  // Left: Turn right forward
-      defenceSubMode = 0;  // Reset sub-mode for immediate re-trigger
+    } else if (Line_Sensor_5 == LINE_SENSOR_BLACK) {
+      defenceSubMode = 0;
       ADirection = MOTOR_FORWARDS;
       BDirection = MOTOR_FORWARDS;
       AMotorDuty = 250;
-      BMotorDuty = 170;
-    }
-    else if (Line_Sensor_2 == LINE_SENSOR_BLACK) {  // Right: Turn left forward
-      defenceSubMode = 0;  // Reset sub-mode
+      BMotorDuty = 150;
+    } else if (Line_Sensor_2 == LINE_SENSOR_BLACK) {
+      defenceSubMode = 0;
       ADirection = MOTOR_FORWARDS;
       BDirection = MOTOR_FORWARDS;
-      AMotorDuty = 170;
+      AMotorDuty = 150;
       BMotorDuty = 250;
-    }
-    // Backs: Push forward
-    else if (Line_Sensor_3 == LINE_SENSOR_BLACK || Line_Sensor_4 == LINE_SENSOR_BLACK) {
-      defenceSubMode = 0;  // Reset sub-mode
+    } else if (Line_Sensor_3 == LINE_SENSOR_BLACK || Line_Sensor_4 == LINE_SENSOR_BLACK) {
+      defenceSubMode = 0;
       ADirection = MOTOR_FORWARDS;
       BDirection = MOTOR_FORWARDS;
       AMotorDuty = 250;
       BMotorDuty = 250;
-    }
-    // Default: Stop if no sensors triggered (rare)
-    else {
+    } else {
       defenceSubMode = 0;
       AMotorDuty = 0;
       BMotorDuty = 0;
     }
   } else if (mode == SEARCH_MODE) {
-    // Sway search: small left/right turns with pauses
     unsigned long currentTime = millis();
-    
-    if (dist1 <= ATTACK_THRESHOLD) {
-      // Opponent detected during sway: snap to ATTACK_MODE
+    if (dist1 < ATTACK_THRESHOLD) {
       mode = ATTACK_MODE;
-      lastAttackCheck = millis();  // Reset timer
-      swayCycleCount = 0;
-    } else if (swayCycleCount >= MAX_SWAY_CYCLES * 2) {  // After full cycles, switch to FULL_SPIN_MODE
-      mode = FULL_SPIN_MODE;
-      swayCycleCount = 0;
+      lastAttackCheck = millis();
+      swayCycleComplete = false;
     } else {
-      // Handle the turn/pause cycle
-      int phase = (currentTime - swayStartTime) / (SCAN_TURN_DURATION + SCAN_PAUSE_DURATION);
-      if (phase % 2 == 0) {  // Turn phase
-        if (swayDirection == 0) {  // Left turn: left motor back, right forward
-          ADirection = MOTOR_BACKWARDS;
-          BDirection = MOTOR_FORWARDS;
-        } else {  // Right turn: left forward, right back
-          ADirection = MOTOR_FORWARDS;
-          BDirection = MOTOR_BACKWARDS;
-        }
+      if (searchState == SEARCH_LEFT_TURN) {
+        ADirection = MOTOR_BACKWARDS;
+        BDirection = MOTOR_FORWARDS;
         AMotorDuty = 200;
-        BMotorDuty = 230;
-      } else {
+        BMotorDuty = 240;
+        if (currentTime - searchStateStartTime >= SEARCH_TURN_DURATION) {
+          searchState = SEARCH_BRAKE;
+          lastSearchTurnState = SEARCH_LEFT_TURN;
+          searchStateStartTime = currentTime;
+        }
+      } else if (searchState == SEARCH_RIGHT_TURN) {
+        ADirection = MOTOR_FORWARDS;
+        BDirection = MOTOR_BACKWARDS;
+        AMotorDuty = 150;
+        BMotorDuty = 150;
+        if (currentTime - searchStateStartTime >= SEARCH_TURN_DURATION) {
+          searchState = SEARCH_BRAKE;
+          lastSearchTurnState = SEARCH_RIGHT_TURN;
+          swayCycleComplete = true;
+          searchStateStartTime = currentTime;
+        }
+      } else if (searchState == SEARCH_BRAKE) {
+        ADirection = MOTOR_BACKWARDS;
+        BDirection = MOTOR_BACKWARDS;
+        AMotorDuty = 100;
+        BMotorDuty = 100;
+        if (currentTime - searchStateStartTime >= SEARCH_BRAKE_DURATION) {
+          searchState = (swayCycleComplete && lastSearchTurnState == SEARCH_RIGHT_TURN) 
+                        ? SEARCH_FULL_SPIN : SEARCH_PAUSE;
+          searchStateStartTime = currentTime;
+        }
+      } else if (searchState == SEARCH_PAUSE) {
         AMotorDuty = 0;
         BMotorDuty = 0;
-      }
-      
-      // Advance to next direction after full turn+pause
-      if (currentTime - swayStartTime >= SCAN_TURN_DURATION + SCAN_PAUSE_DURATION) {
-        swayStartTime = currentTime;
-        swayDirection = 1 - swayDirection;  // Toggle 0<->1
-        swayCycleCount++;
+        if (currentTime - searchStateStartTime >= SEARCH_PAUSE_DURATION) {
+          searchState = (lastSearchTurnState == SEARCH_LEFT_TURN) ? SEARCH_RIGHT_TURN : SEARCH_LEFT_TURN;
+          searchStateStartTime = currentTime;
+        }
+      } else if (searchState == SEARCH_FULL_SPIN) {
+        ADirection = MOTOR_FORWARDS;
+        BDirection = MOTOR_BACKWARDS;
+        AMotorDuty = 255;
+        BMotorDuty = 255;
+        if (currentTime - searchStateStartTime >= SEARCH_FULL_SPIN_DURATION) {
+          searchState = SEARCH_PAUSE;
+          swayCycleComplete = false;
+          searchStateStartTime = currentTime;
+        }
       }
     }
-  } else if (mode == FULL_SPIN_MODE) {
-    // Full 360-degree spin
-    ADirection = MOTOR_BACKWARDS;
-    BDirection = MOTOR_FORWARDS;
-    AMotorDuty = 200;
-    BMotorDuty = 230;
   }
-  // BLIND_MODE remains empty
 
-  // Enforce minimum duty for motor reliability
   if (AMotorDuty > 0 && AMotorDuty < 80) AMotorDuty = 80;
   if (BMotorDuty > 0 && BMotorDuty < 80) BMotorDuty = 80;
 }
@@ -363,7 +513,7 @@ void IRAM_ATTR SonicDistance1() {
     int EchoTime1 = micros() - StartTime1;
     dist1 = (EchoTime1 * 0.0343) / 2;
     if (dist1 > MAX_DISTANCE) {
-      dist1 = MAX_DISTANCE; // Cap distance at 60 cm
+      dist1 = MAX_DISTANCE;
     }
     USready = true;
   }
@@ -442,12 +592,10 @@ void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Se
   tft.setTextColor(TFT_BLACK);
   tft.printf("B:%i", modeB);
 
-  // Display current mode
   tft.setTextDatum(TL_DATUM);
   tft.setTextFont(4);
   tft.setTextSize(1);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
-  // Clear previous mode text to avoid overlap
   tft.fillRect(160, 100, 200, 20, TFT_WHITE);
   const char* modeStr;
   switch (mode) {
@@ -456,7 +604,6 @@ void drawUI(int Line_Sensor_1, int Line_Sensor_2, int Line_Sensor_3, int Line_Se
     case DEFENCE_MODE: modeStr = "DEFENCE"; break;
     case SEARCH_MODE: modeStr = "SEARCH"; break;
     case BLIND_MODE: modeStr = "BLIND"; break;
-    case FULL_SPIN_MODE: modeStr = "SPIN"; break;
     default: modeStr = "UNKNOWN"; break;
   }
   tft.setCursor(160, 100);
