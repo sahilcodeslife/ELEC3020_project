@@ -17,7 +17,7 @@
 #define SONIC_OUT_PIN 12
 #define SONIC_IN_PIN1 43
 #define SONIC_REFRESH_RATE 12000 // max distance ~2m
-#define MAX_DISTANCE 70
+#define MAX_DISTANCE 110
 //----------------------------------------------------------
 
 //-----------DEFINING_MOTORS (TB6612FNG)-------------------
@@ -169,7 +169,7 @@ void setup() {
 #define MOTOR_FORWARDS 0
 #define MOTOR_BACKWARDS 1
 
-#define ATTACK_THRESHOLD 65 // Distance to trigger ATTACK_MODE (cm)
+#define ATTACK_THRESHOLD 100 // Distance to trigger ATTACK_MODE (cm)
 #define SEARCH_TURN_DURATION 400 // ms for each turn (~15-20 degree sweep, tune as needed)
 #define SEARCH_PAUSE_DURATION 100 // ms pause to allow US sensor to update
 #define SEARCH_BRAKE_DURATION 50 // ms for brief braking before pause
@@ -254,7 +254,7 @@ void loop() {
   if (dangerlevel > 0 || defenceSubMode != 0 || (previous_mode == DEFENCE_MODE 
       && millis() - defenceStartTime < (BRAKE_DURATION + SPIN_DURATION + ESCAPE_DURATION))) {
     mode = DEFENCE_MODE;
-  } else if (dist1 >= 60) { // Opponent far
+  } else if (dist1 >= 100) { // Opponent far
     if (mode != SEARCH_MODE) { // Transition to SEARCH_MODE
       mode = SEARCH_MODE;
       searchStateStartTime = millis(); // Reset search timer
