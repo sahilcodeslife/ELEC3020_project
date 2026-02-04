@@ -222,11 +222,6 @@ All CAD work done in Fusion 360. Chassis printed in PETG for durability.
 ✅ Size: 20cm diameter (within 25cm x 25cm limit)  
 ✅ No prohibited weapons (projectiles, liquids, etc.)
 
-## Demo Video
-
-
----
-
 **Course**: ELEC3020 Embedded Systems  
 **Institution**: University of Western Australia  
 **Year**: 2025  
